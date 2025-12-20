@@ -1,0 +1,91 @@
+-- Function to Cancel Fulfillment and Return Stock to Order
+/**
+ * cancel_fulfillment_and_return_stock
+ * 
+ * Cancels a fulfillment that has NOT yet been shipped and returns the allocated stock to the Sales Order.
+ * 
+ * @param p_fulfillment_id  The UUID of the fulfillment to cancel.
+ * @param p_idempotency_key Optional UUID to prevent duplicate cancellations.
+ * 
+ * Logic:
+ * 1. Verifies the fulfillment exists and is NOT 'shipped'.
+ * 2. Iterates through fulfillment lines.
+ * 3. Moves 'reserved' stock from the Fulfillment back to the Sales Order.
+ * 4. Updates Fulfillment status to 'cancelled'.
+ * 5. Triggers an update of the Sales Order status.
+ */
+CREATE OR REPLACE FUNCTION "public"."cancel_fulfillment_and_return_stock"(
+    "p_fulfillment_id" "uuid",
+    "p_idempotency_key" "uuid" DEFAULT NULL
+) RETURNS "void"
+LANGUAGE "plpgsql"
+AS $$
+DECLARE
+    v_order_id uuid;
+    v_line record;
+    v_ledger_entry record;
+    v_qty_to_move int;
+    v_first_entry boolean := true;
+BEGIN
+    -- Idempotency Check
+    IF p_idempotency_key IS NOT NULL AND EXISTS (SELECT 1 FROM inventory_ledger WHERE idempotency_key = p_idempotency_key) THEN
+        RETURN;
+    END IF;
+
+    -- 1. Get Order ID and Verify Status
+    SELECT sales_order_id INTO v_order_id FROM fulfillments WHERE id = p_fulfillment_id;
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Fulfillment not found';
+    END IF;
+
+    -- Only allow cancelling if not shipped
+    IF EXISTS (SELECT 1 FROM fulfillments WHERE id = p_fulfillment_id AND status = 'shipped') THEN
+        RAISE EXCEPTION 'Cannot cancel a shipped fulfillment';
+    END IF;
+
+    -- 2. Loop through Fulfillment Lines to Return Stock
+    FOR v_line IN 
+        SELECT fl.sales_order_line_id, fl.quantity, sol.product_id
+        FROM fulfillment_lines fl
+        JOIN sales_order_lines sol ON fl.sales_order_line_id = sol.id
+        WHERE fl.fulfillment_id = p_fulfillment_id
+    LOOP
+        -- Find stock reserved for this fulfillment
+        FOR v_ledger_entry IN 
+            SELECT location_id, SUM(change_reserved) as reserved_qty
+            FROM inventory_ledger
+            WHERE reference_id = p_fulfillment_id::text AND product_id = v_line.product_id
+            GROUP BY location_id
+            HAVING SUM(change_reserved) > 0
+        LOOP
+            v_qty_to_move := v_ledger_entry.reserved_qty;
+
+            -- A. Unreserve from Fulfillment
+            INSERT INTO inventory_ledger (
+                product_id, location_id, transaction_type, change_reserved, reference_id, notes, idempotency_key
+            )
+            VALUES (
+                v_line.product_id, v_ledger_entry.location_id, 'reserved', -v_qty_to_move, p_fulfillment_id::text, 'Fulfillment Cancelled',
+                CASE WHEN v_first_entry THEN p_idempotency_key ELSE NULL END
+            );
+            v_first_entry := false;
+
+            -- B. Reserve back to Sales Order
+            INSERT INTO inventory_ledger (
+                product_id, location_id, transaction_type, change_reserved, reference_id, notes
+            )
+            VALUES (
+                v_line.product_id, v_ledger_entry.location_id, 'reserved', v_qty_to_move, v_order_id::text, 'Returned from Cancelled Fulfillment'
+            );
+        END LOOP;
+    END LOOP;
+
+    -- 3. Update Fulfillment Status
+    UPDATE fulfillments SET status = 'cancelled' WHERE id = p_fulfillment_id;
+
+    -- 4. Update Sales Order Status (might go back to 'confirmed' or 'reserved')
+    PERFORM update_sales_order_status_from_fulfillment(v_order_id);
+
+END;
+$$;

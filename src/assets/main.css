@@ -1,0 +1,23 @@
+/* Ensure info button icon does not inherit Tag color */
+.info-btn .pi.pi-info-circle {
+    color: var(--primary-color, #2196f3) !important;
+    opacity: 1 !important;
+}
+:root {
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+*:not(.pi):not(.pi *) {
+    font-family: var(--font-family) !important;
+}
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--surface-ground);
+    color: var(--text-color);
+    -webkit-font-smoothing: antialiased;
+}
+
+a {
+    text-decoration: none;
+}

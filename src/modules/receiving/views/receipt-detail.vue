@@ -1,0 +1,127 @@
+<script setup lang="ts">
+/**
+ * COMPONENT: ReceiptDetailView.vue
+ * PURPOSE: Read-only view of a specific historical receipt.
+ * NOTE: To create NEW receipts, use the 'PurchaseDetailView'.
+ */
+
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { supabase } from '@/lib/supabase'
+import { useToast } from 'primevue/usetoast'
+import { formatDate } from '@/lib/formatDate'
+
+// --- Components ---
+import Button from 'primevue/button'
+import Tag from 'primevue/tag'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Panel from 'primevue/panel'
+
+const route = useRoute()
+const router = useRouter()
+const toast = useToast()
+
+const receiptId = route.params.id as string
+const receipt = ref<any>(null)
+const lines = ref<any[]>([])
+const loading = ref(true)
+
+const fetchReceiptData = async () => {
+    loading.value = true
+    
+    // 1. Fetch Receipt Header
+    const { data: header, error: headErr } = await supabase
+        .from('inventory_receipts')
+        .select(`
+            *,
+            purchase_orders ( id, po_number, status, supplier_name )
+        `)
+        .eq('id', receiptId)
+        .maybeSingle()
+
+    if (headErr || !header) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Receipt not found' })
+        router.push('/receipts')
+        return
+    }
+    receipt.value = header
+
+    // 2. Fetch Receipt Lines (The Audit Log)
+    const { data: lineData } = await supabase
+        .from('inventory_receipt_lines')
+        .select(`
+            *,
+            products ( sku, name ),
+            locations ( name )
+        `)
+        .eq('receipt_id', receiptId)
+
+    lines.value = lineData || []
+    loading.value = false
+}
+
+const goToPO = () => {
+    if (receipt.value?.purchase_orders?.id) {
+        router.push(`/purchases/${receipt.value.purchase_orders.id}`)
+    }
+}
+
+onMounted(() => fetchReceiptData())
+</script>
+
+<template>
+    <div v-if="loading" class="flex justify-content-center p-6">
+        <i class="pi pi-spin pi-spinner text-4xl text-500"></i>
+    </div>
+
+    <div v-else-if="receipt" class="flex flex-column gap-4">
+        
+        <div class="surface-card p-4 shadow-2 border-round flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="text-500 text-sm mb-1">Receipt Record</div>
+                <div class="flex align-items-center gap-3">
+                    <h1 class="text-3xl font-bold m-0">{{ receipt.receipt_number }}</h1>
+                    <Tag value="COMPLETED" severity="success" />
+                </div>
+                <div class="mt-2 text-sm text-600">
+                    Received on {{ formatDate(receipt.received_at) }} 
+                    <!-- by <span class="font-semibold">{{ receipt.received_by_user?.email || 'Unknown' }}</span> -->
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <Button label="Back to List" icon="pi pi-arrow-left" text @click="router.push('/receipts')" />
+                <Button label="View Purchase Order" icon="pi pi-external-link" severity="secondary" @click="goToPO" />
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="col-12 md:col-6">
+                <div class="surface-card p-3 border-round shadow-1 h-full">
+                    <div class="text-500 font-medium text-sm mb-2">Vendor Details</div>
+                    <div class="font-bold text-xl">{{ receipt.purchase_orders?.suppliers?.name }}</div>
+                    <div class="text-600">PO: {{ receipt.purchase_orders?.po_number }}</div>
+                </div>
+            </div>
+        </div>
+
+        <Panel header="Items Received">
+            <DataTable :value="lines" stripedRows showGridlines>
+                <Column field="products.sku" header="SKU" style="width: 15%"></Column>
+                <Column field="products.name" header="Product"></Column>
+                <Column field="locations.name" header="Putaway Location">
+                    <template #body="{ data }">
+                        <Tag :value="data.locations?.name || 'Default'" severity="info" />
+                    </template>
+                </Column>
+                <Column field="quantity_received" header="Qty Received" style="width: 10%">
+                    <template #body="{ data }">
+                        <span class="text-green-600 font-bold">+{{ data.quantity_received }}</span>
+                    </template>
+                </Column>
+            </DataTable>
+        </Panel>
+
+    </div>
+</template>
