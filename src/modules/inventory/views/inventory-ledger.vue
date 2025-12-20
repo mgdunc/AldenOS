@@ -231,7 +231,7 @@ onMounted(() => {
                     <template #body="{ data }">
                         <router-link 
                             v-if="getReferenceLink(data)"
-                            :to="getReferenceLink(data)"
+                            :to="getReferenceLink(data) as string"
                             class="text-primary hover:underline font-mono text-sm no-underline flex align-items-center gap-1"
                             :title="data.reference_id"
                         >

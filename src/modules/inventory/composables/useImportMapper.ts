@@ -47,7 +47,7 @@ const LOCATION_FIELDS: ImportField[] = [
 const InventoryImportSchema = z.object({
     sku: z.string().min(1, "SKU is required"),
     location: z.string().min(1, "Location is required"),
-    quantity: z.number({ invalid_type_error: "Quantity must be a number" }).int("Quantity must be an integer"),
+    quantity: z.number({ invalid_type_error: "Quantity must be a number" } as any).int("Quantity must be an integer"),
     notes: z.string().optional()
 })
 
@@ -138,6 +138,7 @@ export function useImportMapper(mode: 'inventory' | 'products' | 'locations' = '
         const workbook = new ExcelJS.Workbook()
         await workbook.xlsx.load(buffer)
         const worksheet = workbook.worksheets[0]
+        if (!worksheet) return
         
         const jsonData: any[] = []
         const headers: string[] = []

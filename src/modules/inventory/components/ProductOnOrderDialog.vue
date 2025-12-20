@@ -36,7 +36,7 @@ const fetchIncoming = async () => {
         console.error('On Order Dialog Error:', error)
         onOrderLines.value = []
     } else if (data) {
-        onOrderLines.value = data.map(d => ({
+        onOrderLines.value = data.map((d: any) => ({
             id: d.purchase_orders.id,
             po_number: d.purchase_orders.po_number,
             status: d.purchase_orders.status,

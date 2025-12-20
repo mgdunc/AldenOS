@@ -39,7 +39,7 @@ const fetchReservations = async () => {
         console.error('Reserved Dialog Error:', error)
         reservedLines.value = []
     } else if (data) {
-        reservedLines.value = data.map(d => ({
+        reservedLines.value = data.map((d: any) => ({
             id: d.sales_orders.id,
             order_number: d.sales_orders.order_number,
             customer: d.sales_orders.customer_name,

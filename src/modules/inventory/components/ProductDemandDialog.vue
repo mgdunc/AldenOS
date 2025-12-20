@@ -57,15 +57,13 @@ const fetchData = async () => {
 
     // Process Demand
     if (demandRes.data) {
-        demandLines.value = demandRes.data
-            .map(d => ({
-                id: d.sales_orders.id,
-                order_number: d.sales_orders.order_number,
-                customer: d.sales_orders.customer_name,
-                status: d.sales_orders.status,
-                qty_needed: (d.quantity_ordered || 0) - (d.quantity_fulfilled || 0)
-            }))
-            .filter(d => d.qty_needed > 0)
+        demandLines.value = demandRes.data.map((d: any) => ({
+            id: d.sales_orders.id,
+            order_number: d.sales_orders.order_number,
+            customer: d.sales_orders.customer_name,
+            status: d.sales_orders.status,
+            qty_needed: (d.quantity_ordered || 0) - (d.quantity_fulfilled || 0)
+        })).filter(d => d.qty_needed > 0)
     }
 
     // Process Incoming

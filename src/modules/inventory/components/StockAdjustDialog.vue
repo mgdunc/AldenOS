@@ -136,7 +136,7 @@ if (error) {
                     placeholder="e.g. 5 or -2"
                     inputClass="w-full"
                     class="w-full"
-                    :min="form.location_id ? -currentStock : null"
+                    :min="form.location_id ? -currentStock : undefined"
                 />
             </div>
 

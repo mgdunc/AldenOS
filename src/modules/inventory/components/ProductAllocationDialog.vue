@@ -54,9 +54,9 @@ const fetchData = async () => {
 
     const [dRes, rRes, iRes] = await Promise.all([demandReq, reservedReq, incomingReq])
 
-    demandLines.value = dRes.data?.map(d => ({ id: d.sales_orders.id, order: d.sales_orders.order_number, customer: d.sales_orders.customer_name, status: d.sales_orders.status, qty: d.quantity_ordered - d.quantity_fulfilled })) || []
-    reservedLines.value = rRes.data?.map(d => ({ id: d.sales_orders.id, order: d.sales_orders.order_number, customer: d.sales_orders.customer_name, status: d.sales_orders.status, qty: d.quantity_ordered - d.quantity_fulfilled })) || []
-    incomingLines.value = iRes.data?.map(d => ({ id: d.purchase_orders.id, order: d.purchase_orders.po_number, status: d.purchase_orders.status, date: d.purchase_orders.expected_date, qty: d.quantity_ordered - d.quantity_received })) || []
+    demandLines.value = dRes.data?.map((d: any) => ({ id: d.sales_orders.id, order: d.sales_orders.order_number, customer: d.sales_orders.customer_name, status: d.sales_orders.status, qty: d.quantity_ordered - d.quantity_fulfilled })) || []
+    reservedLines.value = rRes.data?.map((d: any) => ({ id: d.sales_orders.id, order: d.sales_orders.order_number, customer: d.sales_orders.customer_name, status: d.sales_orders.status, qty: d.quantity_ordered - d.quantity_fulfilled })) || []
+    incomingLines.value = iRes.data?.map((d: any) => ({ id: d.purchase_orders.id, order: d.purchase_orders.po_number, status: d.purchase_orders.status, date: d.purchase_orders.expected_date, qty: d.quantity_ordered - d.quantity_received })) || []
 
     loading.value = false
 }

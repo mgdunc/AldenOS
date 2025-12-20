@@ -54,8 +54,8 @@ const editor = useEditor({
                                 return
                             }
 
-                            popup = tippy('body', {
-                                getReferenceClientRect: props.clientRect,
+                            popup = tippy(document.body, {
+                                getReferenceClientRect: props.clientRect as any,
                                 appendTo: () => document.body,
                                 content: component.element,
                                 showOnCreate: true,
@@ -136,7 +136,7 @@ const getInitials = (email: string) => {
                 <div v-for="event in events" :key="event.id" class="flex gap-3">
                     <!-- Avatar / Icon -->
                     <div class="flex-shrink-0">
-                        <Avatar v-if="event.category === 'chat'" :label="getInitials(event.user_email)" shape="circle" class="bg-blue-100 text-blue-700" />
+                        <Avatar v-if="event.category === 'chat'" :label="getInitials(event.user_email || '')" shape="circle" class="bg-blue-100 text-blue-700" />
                         <div v-else class="w-2rem h-2rem border-circle bg-gray-100 flex align-items-center justify-content-center">
                             <i class="pi pi-cog text-gray-500 text-sm"></i>
                         </div>

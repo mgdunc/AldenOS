@@ -2,16 +2,10 @@
 import { ref, watch, onMounted } from 'vue'
 import { useUsers } from '../composables/useUsers'
 
-const props = defineProps({
-  items: {
-    type: Array,
-    required: true,
-  },
-  command: {
-    type: Function,
-    required: true,
-  },
-})
+const props = defineProps<{
+  items: any[]
+  command: Function
+}>()
 
 const selectedIndex = ref(0)
 

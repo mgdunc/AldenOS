@@ -460,7 +460,7 @@ const getIntegrationUrl = (link: any) => {
                 <Column field="transaction_type" header="Type"><template #body="{ data }"><Tag :value="data.transaction_type" :severity="getTypeSeverity(data.transaction_type)" /></template></Column>
                 <Column field="locations.name" header="Loc" />
                 <Column field="change_qoh" header="Qty"><template #body="{ data }"><span :class="data.change_qoh > 0 ? 'text-green-600' : 'text-red-500'">{{ data.change_qoh }}</span></template></Column>
-                <Column field="reference_id" header="Ref"><template #body="{ data }"><router-link v-if="getReferenceLink(data)" :to="getReferenceLink(data)" class="text-primary">{{ data.reference_id ? 'View' : '-' }}</router-link></template></Column>
+                <Column field="reference_id" header="Ref"><template #body="{ data }"><router-link v-if="getReferenceLink(data)" :to="getReferenceLink(data) as string" class="text-primary">{{ data.reference_id ? 'View' : '-' }}</router-link></template></Column>
             </DataTable>
         </Panel>
 

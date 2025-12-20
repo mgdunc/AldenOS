@@ -10,7 +10,7 @@ const props = defineProps<{
   integrationId: string
 }>()
 
-const logs = ref([])
+const logs = ref<any[]>([])
 const loading = ref(false)
 
 const fetchLogs = async () => {

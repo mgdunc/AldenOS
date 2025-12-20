@@ -202,7 +202,7 @@ const fetchOrderData = async () => {
             let incomingMap: Record<string, any[]> = {}
             incoming?.forEach((row: any) => {
                 if (!incomingMap[row.product_id]) incomingMap[row.product_id] = []
-                incomingMap[row.product_id].push({
+                incomingMap[row.product_id]!.push({
                     po: row.purchase_orders.po_number,
                     date: row.purchase_orders.expected_date,
                     qty: row.quantity_ordered

@@ -54,7 +54,7 @@ onMounted(() => {
         </div>
 
         <div class="card shadow-2 p-0 border-round overflow-hidden surface-card">
-            <DataTable :value="fulfillments" stripedRows :loading="loading" paginator :rows="10" selectionMode="single" @rowSelect="e => navigateToDetail(e.data.id)">
+            <DataTable :value="fulfillments" stripedRows :loading="loading" paginator :rows="10" selectionMode="single" @rowSelect="(e: any) => navigateToDetail(e.data.id)">
                 <template #empty>No fulfillments found.</template>
                 
                 <Column field="fulfillment_number" header="Fulfillment #" sortable class="font-bold" />

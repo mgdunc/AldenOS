@@ -81,9 +81,9 @@ watch(() => props.visible, (newVal) => {
 const locationOptions = computed(() => {
   if (!props.product?.inventory_snapshots) return []
   // Unique locations from snapshots
-  const locs = props.product.inventory_snapshots.map(s => s.locations)
+  const locs = props.product.inventory_snapshots.map((s: any) => s.locations)
   const seen = new Set()
-  return locs.filter(l => l && !seen.has(l.id) && seen.add(l.id))
+  return locs.filter((l: any) => l && !seen.has(l.id) && seen.add(l.id))
 })
 
 const doAdjustStock = async () => {

@@ -16,8 +16,8 @@ import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 
 const router = useRouter()
-const receipts = ref([])
-const receivablePOs = ref([])
+const receipts = ref<any[]>([])
+const receivablePOs = ref<any[]>([])
 const loading = ref(true)
 const showNewReceiptDialog = ref(false)
 const loadingPOs = ref(false)

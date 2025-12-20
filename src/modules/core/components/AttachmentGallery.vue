@@ -30,7 +30,7 @@ const onFileSelect = async (event: Event) => {
     if (!input.files || input.files.length === 0) return
 
     uploading.value = true
-    const file = input.files[0]
+    const file = input.files[0] as File
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
     const filePath = `${props.folderId}/${sanitizedName}`
 
