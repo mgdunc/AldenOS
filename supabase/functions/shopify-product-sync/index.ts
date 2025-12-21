@@ -99,7 +99,8 @@ serve(async (req) => {
       let matchedCount = 0
       let updatedCount = 0
 
-      for await (const products of shopify.getProducts()) {
+      // Increase page size to 250 to reduce roundtrips
+      for await (const products of shopify.getProducts(250)) {
         // Check for cancellation
         if (jobId) {
           const { data: job } = await supabase.from('integration_sync_jobs').select('status').eq('id', jobId).single()
@@ -175,7 +176,7 @@ serve(async (req) => {
                         inventory_item_id: variant.inventory_item_id,
                         weight: variant.weight,
                         weight_unit: variant.weight_unit,
-                        images: sp.images,
+                        // images: sp.images, // Removed to reduce payload size
                         image_url: sp.image?.src || sp.images?.[0]?.src
                     }
                 })
