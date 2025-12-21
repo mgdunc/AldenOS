@@ -25,7 +25,10 @@ let jobChannel: RealtimeChannel | null = null
 
 const progressPercentage = computed(() => {
   if (!currentJob.value || !currentJob.value.total_items) return 0
-  return Math.round((currentJob.value.processed_items / currentJob.value.total_items) * 100)
+  const processed = currentJob.value.processed_items || 0
+  const total = currentJob.value.total_items
+  const pct = Math.round((processed / total) * 100)
+  return isNaN(pct) ? 0 : pct
 })
 
 const estimatedTimeRemaining = computed(() => {

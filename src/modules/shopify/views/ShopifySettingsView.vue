@@ -81,7 +81,7 @@ onMounted(() => {
             <Listbox 
                 v-model="selectedIntegration" 
                 :options="integrations" 
-                optionLabel="settings.shop_url" 
+                :optionLabel="(option: any) => option.settings?.shop_url || 'New Store'" 
                 class="w-full border-none p-0"
                 listStyle="max-height: 400px"
             >
