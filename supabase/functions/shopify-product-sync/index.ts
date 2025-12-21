@@ -111,19 +111,34 @@ serve(async (req) => {
 
         // Process Batch
         const unmatchedBatch: any[] = []
+        const integrationUpserts: any[] = []
+        const productUpdates: Promise<any>[] = []
 
+        // 1. Collect all SKUs in this batch
+        const skusInBatch = new Set<string>()
+        for (const sp of products) {
+            for (const variant of sp.variants) {
+                if (variant.sku) skusInBatch.add(variant.sku)
+            }
+        }
+
+        // 2. Fetch existing products in one go
+        const { data: existingProducts } = await supabase
+            .from('products')
+            .select('id, sku, image_url')
+            .in('sku', Array.from(skusInBatch))
+        
+        const productMap = new Map<string, any>()
+        if (existingProducts) {
+            existingProducts.forEach((p: any) => productMap.set(p.sku, p))
+        }
+
+        // 3. Process products using the map
         for (const sp of products) {
           for (const variant of sp.variants) {
-            // Find product by SKU
-            if (!variant.sku) {
-                continue
-            }
+            if (!variant.sku) continue
 
-            const { data: existingProduct } = await supabase
-              .from('products')
-              .select('id, sku, image_url')
-              .eq('sku', variant.sku)
-              .single()
+            const existingProduct = productMap.get(variant.sku)
 
             if (existingProduct) {
               matchedCount++
@@ -131,22 +146,20 @@ serve(async (req) => {
               // Update image if missing
               if (!existingProduct.image_url && (sp.image?.src || sp.images?.[0]?.src)) {
                   const imageUrl = sp.image?.src || sp.images?.[0]?.src
-                  await supabase.from('products').update({
-                      image_url: imageUrl
-                  }).eq('id', existingProduct.id)
+                  productUpdates.push(
+                      supabase.from('products').update({ image_url: imageUrl }).eq('id', existingProduct.id)
+                  )
               }
 
-              // Update product with Shopify ID
-              const { error: linkError } = await supabase
-                .from('product_integrations')
-                .upsert({
+              // Prepare integration link
+              integrationUpserts.push({
                     product_id: existingProduct.id,
                     integration_id: integration.id,
                     external_product_id: sp.id.toString(),
                     external_variant_id: variant.id.toString()
-                }, { onConflict: 'product_id, integration_id' })
+              })
 
-              if (!linkError) updatedCount++
+              updatedCount++
             } else {
                 // Add to unmatched batch
                 unmatchedBatch.push({
@@ -171,7 +184,15 @@ serve(async (req) => {
           processedCount++
         }
 
-        // Insert Unmatched Batch
+        // 4. Execute Bulk Operations
+        if (integrationUpserts.length > 0) {
+            const { error: linkError } = await supabase
+                .from('product_integrations')
+                .upsert(integrationUpserts, { onConflict: 'product_id, integration_id' })
+            
+            if (linkError) console.error('Error linking products:', linkError)
+        }
+
         if (unmatchedBatch.length > 0) {
             const { error: unmatchedError } = await supabase
                 .from('integration_unmatched_products')
@@ -180,6 +201,10 @@ serve(async (req) => {
             if (unmatchedError) {
                 console.error('Error inserting unmatched products:', unmatchedError)
             }
+        }
+
+        if (productUpdates.length > 0) {
+            await Promise.all(productUpdates)
         }
 
         // Update Progress
