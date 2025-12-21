@@ -5,11 +5,11 @@ import { supabase } from '@/lib/supabase'
 import { FilterMatchMode } from '@primevue/core/api'
 
 // Centralized Dialog Components
-import ProductInventoryDialog from '@/components/ProductInventoryDialog.vue' 
-import ProductDemandDialog from '@/components/ProductDemandDialog.vue'
-import ProductReservedDialog from '@/components/ProductReservedDialog.vue'
-import ProductOnOrderDialog from '@/components/ProductOnOrderDialog.vue'
-import ProductCreateDialog from '@/components/ProductCreateDialog.vue'
+import ProductInventoryDialog from '@/modules/inventory/components/ProductInventoryDialog.vue' 
+import ProductDemandDialog from '@/modules/inventory/components/ProductDemandDialog.vue'
+import ProductReservedDialog from '@/modules/inventory/components/ProductReservedDialog.vue'
+import ProductOnOrderDialog from '@/modules/inventory/components/ProductOnOrderDialog.vue'
+import ProductCreateDialog from '@/modules/inventory/components/ProductCreateDialog.vue'
 
 // UI Components
 import DataTable from 'primevue/datatable'

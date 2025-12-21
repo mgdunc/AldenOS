@@ -201,7 +201,7 @@ onMounted(fetchOrders)
                 :filters="filters"
                 selectionMode="single" 
                 dataKey="id"
-                @rowSelect="e => router.push(`/sales/${e.data.id}`)"
+                @rowSelect="(e: any) => router.push(`/sales/${e.data.id}`)"
             >
                 <template #empty><div class="p-4 text-center">No sales orders found for this filter.</div></template>
 

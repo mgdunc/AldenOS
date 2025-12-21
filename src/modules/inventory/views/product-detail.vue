@@ -218,6 +218,7 @@ const onFileSelect = async (event: Event) => {
     if (!input.files || input.files.length === 0) return
 
     const file = input.files[0]
+    if (!file) return
     
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
