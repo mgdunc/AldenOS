@@ -1,0 +1,106 @@
+export interface ShopifyConfig {
+  shopUrl: string;
+  accessToken: string;
+  apiVersion?: string;
+}
+
+export class ShopifyClient {
+  private baseUrl: string;
+  private headers: HeadersInit;
+
+  constructor(config: ShopifyConfig) {
+    const cleanUrl = config.shopUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const version = config.apiVersion || '2023-04';
+    this.baseUrl = `https://${cleanUrl}/admin/api/${version}`;
+    this.headers = {
+      'X-Shopify-Access-Token': config.accessToken,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  async fetch(path: string, options: RequestInit = {}): Promise<Response> {
+    const url = path.startsWith('http') ? path : `${this.baseUrl}/${path}`;
+    
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        const res = await fetch(url, { ...options, headers: this.headers });
+        
+        if (res.status === 429) {
+          const retryAfter = res.headers.get('Retry-After');
+          const wait = retryAfter ? parseFloat(retryAfter) * 1000 : 2000;
+          console.warn(`Rate limit hit. Waiting ${wait}ms`);
+          await new Promise(resolve => setTimeout(resolve, wait + 1000));
+          retries--;
+          continue;
+        }
+
+        return res;
+      } catch (e) {
+        console.warn(`Network error: ${e instanceof Error ? e.message : String(e)}. Retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        retries--;
+        if (retries === 0) throw e;
+      }
+    }
+    throw new Error("Shopify API Request Failed (Max Retries)");
+  }
+
+  async getProductsCount(): Promise<number> {
+    const res = await this.fetch('products/count.json');
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Failed to get count: ${res.status} ${text}`);
+    }
+    const data = await res.json();
+    return data.count;
+  }
+
+  async *getProducts(limit = 50) {
+    let url = `products.json?limit=${limit}`;
+    
+    while (url) {
+      const res = await this.fetch(url);
+      if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Failed to fetch products: ${res.status} ${text}`);
+      }
+      
+      const data = await res.json();
+      yield data.products;
+
+      const linkHeader = res.headers.get('Link');
+      url = '';
+      if (linkHeader) {
+        const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        if (match) url = match[1];
+      }
+    }
+  }
+
+  // Placeholder for future Orders sync
+  async *getOrders(limit = 50, status = 'any') {
+    let url = `orders.json?limit=${limit}&status=${status}`;
+    while (url) {
+        const res = await this.fetch(url);
+        if (!res.ok) throw new Error(`Failed to fetch orders: ${res.statusText}`);
+        const data = await res.json();
+        yield data.orders;
+        
+        const linkHeader = res.headers.get('Link');
+        url = '';
+        if (linkHeader) {
+            const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+            if (match) url = match[1];
+        }
+    }
+  }
+
+  // Placeholder for Inventory Levels
+  async getInventoryLevels(inventoryItemIds: string[]) {
+    const ids = inventoryItemIds.join(',');
+    const res = await this.fetch(`inventory_levels.json?inventory_item_ids=${ids}`);
+    if (!res.ok) throw new Error(`Failed to fetch inventory levels`);
+    return await res.json();
+  }
+}

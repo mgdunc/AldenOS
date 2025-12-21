@@ -1,9 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { corsHeaders } from "../_shared/cors.ts"
+import { ShopifyClient } from "../_shared/shopify.ts"
 
 console.log("Shopify Product Sync Function Started")
 
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   // 1. Setup Supabase Client
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -19,7 +26,10 @@ serve(async (req) => {
     jobId = body.jobId
     integrationId = body.integrationId
   } catch (e) {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), { status: 400 })
+    return new Response(JSON.stringify({ error: "Invalid request body" }), { 
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
   }
 
   // Define the background task
@@ -60,64 +70,36 @@ serve(async (req) => {
 
       if (sync_id) await log("Starting product sync...", "info")
 
-      let { shop_url, access_token } = integration.settings
+      const { shop_url, access_token } = integration.settings
       if (!shop_url || !access_token) {
         throw new Error("Missing Shop URL or Access Token")
       }
 
-      // Clean URL
-      shop_url = shop_url.replace(/^https?:\/\//, '').replace(/\/$/, '')
-      
-      const headers = {
-        'X-Shopify-Access-Token': access_token,
-        'Content-Type': 'application/json'
-      }
-
-      // Helper for rate limits
-      const fetchShopify = async (url: string) => {
-          let retries = 5
-          while (retries > 0) {
-              try {
-                const res = await fetch(url, { headers })
-                if (res.status === 429) {
-                    const retryAfter = res.headers.get('Retry-After')
-                    const wait = retryAfter ? parseFloat(retryAfter) * 1000 : 2000
-                    await log(`Rate limit hit. Waiting ${wait}ms`, 'warning')
-                    await new Promise(resolve => setTimeout(resolve, wait + 1000))
-                    retries--
-                    continue
-                }
-                return res
-              } catch (e) {
-                 // Network error, wait and retry
-                 await log(`Network error: ${e.message}. Retrying...`, 'warning')
-                 await new Promise(resolve => setTimeout(resolve, 2000))
-                 retries--
-              }
-          }
-          throw new Error("Shopify API Request Failed (Max Retries)")
-      }
+      // Initialize Shopify Client
+      const shopify = new ShopifyClient({
+        shopUrl: shop_url,
+        accessToken: access_token
+      })
 
       // 3. Get Total Count
-      const countUrl = `https://${shop_url}/admin/api/2023-04/products/count.json`
-      const countRes = await fetchShopify(countUrl)
-      if (countRes.ok) {
-        const countJson = await countRes.json()
+      try {
+        const count = await shopify.getProductsCount()
         if (jobId) {
           await supabase.from('integration_sync_jobs').update({
-            total_items: countJson.count
+            total_items: count
           }).eq('id', jobId)
         }
-        await log(`Found ${countJson.count} products to sync.`, "info")
+        await log(`Found ${count} products to sync.`, "info")
+      } catch (e) {
+        await log(`Failed to get product count: ${e.message}`, "warning")
       }
 
       // 4. Fetch Products from Shopify (Paginated)
-      let nextUrl: string | null = `https://${shop_url}/admin/api/2023-04/products.json?limit=50`
       let processedCount = 0
       let matchedCount = 0
       let updatedCount = 0
 
-      while (nextUrl) {
+      for await (const products of shopify.getProducts()) {
         // Check for cancellation
         if (jobId) {
           const { data: job } = await supabase.from('integration_sync_jobs').select('status').eq('id', jobId).single()
@@ -127,21 +109,6 @@ serve(async (req) => {
           }
         }
 
-        const response = await fetchShopify(nextUrl)
-        const responseText = await response.text()
-
-        if (!response.ok) {
-          throw new Error(`Shopify API Error (${response.status}): ${responseText}`)
-        }
-
-        let products = []
-        try {
-            const json = JSON.parse(responseText)
-            products = json.products
-        } catch (e) {
-            throw new Error(`Failed to parse Shopify response: ${responseText.substring(0, 100)}...`)
-        }
-
         // Process Batch
         const unmatchedBatch: any[] = []
 
@@ -149,7 +116,6 @@ serve(async (req) => {
           for (const variant of sp.variants) {
             // Find product by SKU
             if (!variant.sku) {
-                // Skip variants without SKU, or maybe log them?
                 continue
             }
 
@@ -162,7 +128,6 @@ serve(async (req) => {
             if (existingProduct) {
               matchedCount++
               // Update product with Shopify ID
-              // Also create entry in product_integrations if not exists
               const { error: linkError } = await supabase
                 .from('product_integrations')
                 .upsert({
@@ -183,7 +148,7 @@ serve(async (req) => {
                     name: sp.title,
                     variant_name: variant.title === 'Default Title' ? sp.title : `${sp.title} - ${variant.title}`,
                     price: variant.price,
-                    cost: variant.inventory_item_id ? 0 : 0, // Shopify API doesn't always return cost in this endpoint
+                    cost: variant.inventory_item_id ? 0 : 0,
                     data: {
                         inventory_item_id: variant.inventory_item_id,
                         weight: variant.weight,
@@ -213,14 +178,6 @@ serve(async (req) => {
             processed_items: processedCount,
             updated_at: new Date().toISOString()
           }).eq('id', jobId)
-        }
-
-        // Get Next Page
-        const linkHeader = response.headers.get('Link')
-        nextUrl = null
-        if (linkHeader) {
-          const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/)
-          if (match) nextUrl = match[1]
         }
       }
 
@@ -262,6 +219,6 @@ serve(async (req) => {
   // Return immediately
   return new Response(
     JSON.stringify({ message: "Sync started in background" }),
-    { headers: { "Content-Type": "application/json" } }
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   )
 })

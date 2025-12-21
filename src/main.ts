@@ -27,4 +27,10 @@ app.use(PrimeVue, {
 
 app.directive('tooltip', Tooltip)
 
+app.config.errorHandler = (err, instance, info) => {
+    console.error('Global Error Handler:', err)
+    console.error('Info:', info)
+    // You could also send this to a logging service like Sentry
+}
+
 app.mount('#app')

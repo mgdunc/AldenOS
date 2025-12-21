@@ -19,7 +19,12 @@ const router = createRouter({
     ...fulfillmentRoutes,
     ...purchasingRoutes,
     ...receivingRoutes,
-    ...shopifyRoutes
+    ...shopifyRoutes,
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/modules/core/views/NotFoundView.vue')
+    }
   ]
 })
 

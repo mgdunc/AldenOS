@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onErrorCaptured } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import Toast from 'primevue/toast'
@@ -8,11 +8,24 @@ import Menu from 'primevue/menu'
 import Button from 'primevue/button'
 import Avatar from 'primevue/avatar'
 import Drawer from 'primevue/drawer' // For mobile sidebar
+import ErrorView from '@/modules/core/views/ErrorView.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const mobileMenuVisible = ref(false)
+const globalError = ref<any>(null)
+
+onErrorCaptured((err) => {
+    console.error('Global Error Captured:', err)
+    globalError.value = err
+    return false // Prevent propagation
+})
+
+const resetError = () => {
+    globalError.value = null
+    router.push('/')
+}
 
 onMounted(() => {
     authStore.initialize()
@@ -135,7 +148,8 @@ const items = ref([
             </div>
 
             <div class="flex-1 overflow-y-auto p-4" style="font-size: 0.925rem">
-                <RouterView />
+                <ErrorView v-if="globalError" :error="globalError" :reset="resetError" />
+                <RouterView v-else />
             </div>
         </div>
     </div>
