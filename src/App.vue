@@ -88,7 +88,14 @@ const items = ref([
     <Toast position="top-right" :life="3000" />
     <ConfirmDialog />
     
-    <div class="flex h-screen overflow-hidden surface-ground">
+    <div v-if="authStore.loading" class="flex align-items-center justify-content-center h-screen w-screen surface-ground">
+        <div class="flex flex-column align-items-center gap-3">
+            <i class="pi pi-spin pi-spinner text-4xl text-primary"></i>
+            <div class="text-700 font-medium">Loading AldenOS...</div>
+        </div>
+    </div>
+
+    <div v-else class="flex h-screen overflow-hidden surface-ground">
         
         <!-- Sidebar: Slightly darker (gray-100) for contrast -->
         <div v-if="authStore.isAuthenticated" class="hidden md:flex flex-column h-full bg-gray-100 border-right-1 surface-border shadow-2" style="width: 18rem; min-width: 18rem;">

@@ -121,12 +121,21 @@ serve(async (req) => {
 
             const { data: existingProduct } = await supabase
               .from('products')
-              .select('id, sku')
+              .select('id, sku, image_url')
               .eq('sku', variant.sku)
               .single()
 
             if (existingProduct) {
               matchedCount++
+              
+              // Update image if missing
+              if (!existingProduct.image_url && (sp.image?.src || sp.images?.[0]?.src)) {
+                  const imageUrl = sp.image?.src || sp.images?.[0]?.src
+                  await supabase.from('products').update({
+                      image_url: imageUrl
+                  }).eq('id', existingProduct.id)
+              }
+
               // Update product with Shopify ID
               const { error: linkError } = await supabase
                 .from('product_integrations')
@@ -153,7 +162,8 @@ serve(async (req) => {
                         inventory_item_id: variant.inventory_item_id,
                         weight: variant.weight,
                         weight_unit: variant.weight_unit,
-                        images: sp.images
+                        images: sp.images,
+                        image_url: sp.image?.src || sp.images?.[0]?.src
                     }
                 })
             }

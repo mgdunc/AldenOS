@@ -5,11 +5,11 @@ import { supabase } from '@/lib/supabase'
 import { FilterMatchMode } from '@primevue/core/api'
 
 // Centralized Dialog Components
-import ProductInventoryDialog from '@/modules/inventory/components/ProductInventoryDialog.vue' 
-import ProductDemandDialog from '@/modules/inventory/components/ProductDemandDialog.vue'
-import ProductReservedDialog from '@/modules/inventory/components/ProductReservedDialog.vue'
-import ProductOnOrderDialog from '@/modules/inventory/components/ProductOnOrderDialog.vue'
-import ProductCreateDialog from '@/modules/inventory/components/ProductCreateDialog.vue'
+import ProductInventoryDialog from '@/components/ProductInventoryDialog.vue' 
+import ProductDemandDialog from '@/components/ProductDemandDialog.vue'
+import ProductReservedDialog from '@/components/ProductReservedDialog.vue'
+import ProductOnOrderDialog from '@/components/ProductOnOrderDialog.vue'
+import ProductCreateDialog from '@/components/ProductCreateDialog.vue'
 
 // UI Components
 import DataTable from 'primevue/datatable'
@@ -22,7 +22,6 @@ import Button from 'primevue/button'
 import Toolbar from 'primevue/toolbar'
 import Dropdown from 'primevue/dropdown'
 import Badge from 'primevue/badge'
-import Dialog from 'primevue/dialog'
 
 const products = ref<any[]>([])
 const loading = ref(false)
@@ -104,35 +103,7 @@ const fetchProducts = async () => {
         console.error(error)
     } else {
         totalRecords.value = count || 0
-        
-        // Fetch Shopify status for these products
-        if (data && data.length > 0) {
-            const productIds = data.map(p => p.product_id)
-            
-            // 1. Check Legacy Links
-            const { data: legacyData } = await supabase
-                .from('products')
-                .select('id')
-                .in('id', productIds)
-                .not('shopify_product_id', 'is', null)
-            
-            // 2. Check Multi-Store Links
-            const { data: integrationData } = await supabase
-                .from('product_integrations')
-                .select('product_id')
-                .in('product_id', productIds)
-
-            const linkedSet = new Set<string>()
-            legacyData?.forEach(p => linkedSet.add(p.id))
-            integrationData?.forEach(p => linkedSet.add(p.product_id))
-
-            products.value = data.map(p => ({
-                ...p,
-                is_shopify_linked: linkedSet.has(p.product_id)
-            }))
-        } else {
-            products.value = []
-        }
+        products.value = data || []
     }
     loading.value = false
 }
@@ -183,6 +154,10 @@ const onSearch = () => {
 const onStatusChange = () => {
     lazyParams.value.first = 0
     fetchProducts()
+}
+
+const exportCSV = () => {
+    dt.value.exportCSV()
 }
 
 onMounted(() => {
@@ -275,6 +250,7 @@ const getStatusSeverity = (status: string) => {
                 <template #start>
                     <div class="flex gap-2">
                         <Button label="New Product" icon="pi pi-plus" severity="success" @click="showCreateDialog = true" />
+                        <Button label="Export" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
                     </div>
                 </template>
                 <template #end>
@@ -302,17 +278,6 @@ const getStatusSeverity = (status: string) => {
                 stripedRows
                 class="p-datatable-sm"
             >
-                <Column header="Img" style="width: 4rem">
-                    <template #body="{ data }">
-                        <div v-if="data.image_url" class="w-3rem h-3rem border-round surface-100 flex align-items-center justify-content-center overflow-hidden border-1 surface-border">
-                            <img :src="data.image_url" class="w-full h-full" style="object-fit: contain;" />
-                        </div>
-                        <div v-else class="w-3rem h-3rem border-round surface-100 flex align-items-center justify-content-center border-1 surface-border">
-                            <i class="pi pi-image text-300"></i>
-                        </div>
-                    </template>
-                </Column>
-
                 <Column field="sku" header="SKU" sortable style="min-width: 8rem">
                     <template #body="{ data }">
                         <router-link :to="`/product/${data.product_id}`" class="text-primary font-bold hover:underline cursor-pointer no-underline">
@@ -322,13 +287,6 @@ const getStatusSeverity = (status: string) => {
                 </Column>
                 
                 <Column field="name" header="Product" sortable style="min-width: 12rem" />
-
-                <Column header="Shopify" style="width: 4rem" class="text-center">
-                    <template #body="{ data }">
-                        <i v-if="data.is_shopify_linked" class="pi pi-shopping-bag text-green-500" title="Linked to Shopify"></i>
-                        <i v-else class="pi pi-circle text-300" title="Not Linked"></i>
-                    </template>
-                </Column>
                 
                 <Column field="status" header="Status" sortable style="width: 8rem">
                     <template #body="{ data }">

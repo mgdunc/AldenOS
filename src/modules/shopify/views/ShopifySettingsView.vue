@@ -73,17 +73,16 @@ onMounted(() => {
       <Button label="Add Store" icon="pi pi-plus" @click="createNew" />
     </div>
     
-    <div class="grid">
+    <div class="flex flex-column gap-4">
       <!-- Store List -->
-      <div class="col-12 md:col-3">
-        <div class="surface-card shadow-2 border-round p-3 h-full">
+      <div class="surface-card shadow-2 border-round p-3">
             <h3 class="text-lg font-bold mb-3">Connected Stores</h3>
             <Listbox 
                 v-model="selectedIntegration" 
                 :options="integrations" 
                 :optionLabel="(option: any) => option.settings?.shop_url || 'New Store'" 
                 class="w-full border-none p-0"
-                listStyle="max-height: 400px"
+                listStyle="max-height: 200px"
             >
                 <template #option="{ option }">
                     <div class="flex align-items-center gap-2">
@@ -98,20 +97,18 @@ onMounted(() => {
                     <div class="p-3 text-center text-500">No stores connected.</div>
                 </template>
             </Listbox>
-        </div>
       </div>
 
       <!-- Details -->
-      <div class="col-12 md:col-9" v-if="selectedIntegration">
-        <div class="grid">
-            <div class="col-12 xl:col-5">
+      <div v-if="selectedIntegration" class="flex flex-column gap-4">
+            <div class="w-full">
                 <ShopifyIntegrationCard 
                     :key="selectedIntegration.id"
                     :integration-id="selectedIntegration.id === 'new' ? null : selectedIntegration.id"
                     @saved="onSaved"
                 />
             </div>
-            <div class="col-12 xl:col-7" v-if="selectedIntegration.id !== 'new'">
+            <div class="w-full" v-if="selectedIntegration.id !== 'new'">
                 <Tabs value="0">
                 <TabList>
                     <Tab value="0">Product Sync</Tab>
@@ -135,7 +132,6 @@ onMounted(() => {
                 </TabPanels>
                 </Tabs>
             </div>
-        </div>
       </div>
     </div>
   </div>

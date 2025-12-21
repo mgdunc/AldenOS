@@ -16,7 +16,7 @@ import Column from 'primevue/column'
 import Panel from 'primevue/panel'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Card from 'primevue/card'
 import Divider from 'primevue/divider'
 import Textarea from 'primevue/textarea'
@@ -39,6 +39,8 @@ const shopifyIntegrations = ref<any[]>([])
 const productIntegrations = ref<any[]>([])
 const loading = ref(true)
 const saving = ref(false)
+const uploadingImage = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 const totalOnOrder = ref(0)
 const totalRequired = ref(0) 
@@ -84,7 +86,7 @@ const loadData = async () => {
         // 1b. Fetch Details from Table (Shopify IDs, etc not in view)
         const detailsQuery = supabase
             .from('products')
-            .select('shopify_product_id, shopify_variant_id, supplier_id, carton_barcode')
+            .select('shopify_product_id, shopify_variant_id, supplier_id, carton_barcode, image_url')
             .eq('id', id)
             .single()
 
@@ -195,7 +197,8 @@ const updateProduct = async () => {
         list_price: product.value.list_price,
         compare_at_price: product.value.compare_at_price,
         product_type: product.value.product_type,
-        vendor: product.value.vendor
+        vendor: product.value.vendor,
+        image_url: product.value.image_url
     }).eq('id', product.value.id)
 
     if (error) {
@@ -204,6 +207,78 @@ const updateProduct = async () => {
         toast.add({ severity: 'success', summary: 'Saved', detail: 'Product updated successfully' })
     }
     saving.value = false
+}
+
+const triggerFileUpload = () => {
+    fileInput.value?.click()
+}
+
+const onFileSelect = async (event: Event) => {
+    const input = event.target as HTMLInputElement
+    if (!input.files || input.files.length === 0) return
+
+    const file = input.files[0]
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+        toast.add({ severity: 'error', summary: 'Invalid File', detail: 'Please upload a valid image file (JPEG, PNG, WebP, or GIF)' })
+        input.value = ''
+        return
+    }
+    
+    // Validate file size (5MB)
+    if (file.size > 5242880) {
+        toast.add({ severity: 'error', summary: 'File Too Large', detail: 'Image must be less than 5MB' })
+        input.value = ''
+        return
+    }
+    
+    uploadingImage.value = true
+
+    try {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${product.value.id}/${Date.now()}.${fileExt}`
+        
+        const { error: uploadError } = await supabase.storage
+            .from('products')
+            .upload(fileName, file, {
+                cacheControl: '3600',
+                upsert: false
+            })
+
+        if (uploadError) {
+            console.error('Upload error:', uploadError)
+            throw new Error(uploadError.message || 'Failed to upload file')
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('products')
+            .getPublicUrl(fileName)
+
+        // Save to database immediately
+        const { error: updateError } = await supabase
+            .from('products')
+            .update({ image_url: publicUrl })
+            .eq('id', product.value.id)
+
+        if (updateError) throw new Error(updateError.message)
+
+        product.value.image_url = publicUrl
+        toast.add({ severity: 'success', summary: 'Uploaded', detail: 'Image uploaded successfully' })
+        
+    } catch (e: any) {
+        console.error('Upload error:', e)
+        toast.add({ 
+            severity: 'error', 
+            summary: 'Upload Failed', 
+            detail: e.message || 'Failed to upload image. Please try again.',
+            life: 5000
+        })
+    } finally {
+        uploadingImage.value = false
+        input.value = ''
+    }
 }
 
 const onAdjustmentSaved = () => {
@@ -272,6 +347,7 @@ const getIntegrationUrl = (link: any) => {
                 </div>
             </div>
             <div class="flex gap-2">
+                <Button label="Save Changes" icon="pi pi-save" @click="updateProduct" :loading="saving" />
                 <Button label="Adjust Stock" icon="pi pi-sliders-h" severity="info" @click="showAdjustDialog = true" />
             </div>
         </div>
@@ -335,120 +411,142 @@ const getIntegrationUrl = (link: any) => {
             </div>
         </div>
 
-        <!-- Product Details (Full Width) -->
-        <div class="surface-card p-4 shadow-2 border-round">
-            <div class="flex justify-content-between align-items-center mb-4">
-                <div class="text-xl font-bold flex align-items-center gap-2">
-                    <i class="pi pi-info-circle text-primary"></i>
-                    Product Details
-                </div>
-                <Button label="Save Changes" icon="pi pi-check" @click="updateProduct" :loading="saving" />
-            </div>
-            
-            <div class="grid formgrid p-fluid">
-                <!-- Identification -->
-                <div class="col-12">
-                    <div class="text-500 font-bold text-sm mb-3 uppercase">Identification & Sourcing</div>
-                </div>
-
-                <div class="field col-12">
-                    <label class="font-bold">Description</label>
-                    <Textarea v-model="product.description" rows="3" autoResize placeholder="Product description..." />
-                </div>
-
-                <div class="field col-12 md:col-4">
-                    <label class="font-bold">Vendor</label>
-                    <InputText v-model="product.vendor" placeholder="Brand / Vendor" />
-                </div>
-
-                <div class="field col-12 md:col-4">
-                    <label class="font-bold">Product Type</label>
-                    <InputText v-model="product.product_type" placeholder="e.g. Lighting, Furniture" />
-                </div>
-
-                <div class="field col-12 md:col-4">
-                    <label class="font-bold">Supplier</label>
-                    <Dropdown v-model="product.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" placeholder="Select Supplier" filter showClear class="w-full" />
-                </div>
-
-                <div class="field col-12 md:col-6">
-                    <label class="font-bold">Product Barcode (UPC/EAN)</label>
-                    <div class="p-inputgroup">
-                        <span class="p-inputgroup-addon"><i class="pi pi-barcode"></i></span>
-                        <InputText v-model="product.barcode" placeholder="Scan barcode..." />
-                    </div>
-                </div>
-
-                <div class="field col-12 md:col-6">
-                    <label class="font-bold">Carton Barcode (ITF-14)</label>
-                    <div class="p-inputgroup">
-                        <span class="p-inputgroup-addon"><i class="pi pi-box"></i></span>
-                        <InputText v-model="product.carton_barcode" placeholder="Scan carton barcode..." />
-                    </div>
-                </div>
-
-                <div class="col-12">
-                    <Divider />
-                    <div class="text-500 font-bold text-sm mb-3 uppercase">Pricing & Specifications</div>
-                </div>
-
-                <div class="field col-12 md:col-4">
-                    <label class="font-bold">Sale Price</label>
-                    <InputNumber v-model="product.list_price" mode="currency" currency="USD" locale="en-US" placeholder="$0.00" />
-                </div>
-
-                <div class="field col-12 md:col-4">
-                    <label class="font-bold">Compare-at Price</label>
-                    <InputNumber v-model="product.compare_at_price" mode="currency" currency="USD" locale="en-US" placeholder="$0.00" />
-                </div>
-
-                <div class="field col-12 md:col-4">
-                    <label class="font-bold">Cost Price</label>
-                    <InputNumber v-model="product.cost_price" mode="currency" currency="USD" locale="en-US" placeholder="$0.00" />
-                </div>
-
-                <div class="field col-12 md:col-4">
-                    <label class="font-bold">Carton Quantity</label>
-                    <InputNumber v-model="product.carton_qty" showButtons :min="1" placeholder="Units per carton" />
-                </div>
-
-                <div class="field col-12 md:col-8">
-                    <label class="font-bold">Shopify Integration</label>
-                    <div class="flex flex-column gap-2">
-                        <!-- Legacy Link -->
-                        <a v-if="product.shopify_product_id && getShopifyUrl()" 
-                           :href="getShopifyUrl()" 
-                           target="_blank"
-                           class="flex align-items-center gap-2 text-green-600 bg-green-50 px-3 py-2 border-round border-1 border-green-200 w-full no-underline hover:bg-green-100 transition-colors cursor-pointer"
-                        >
-                            <i class="pi pi-check-circle"></i>
-                            <span class="font-medium">Linked (Legacy)</span>
-                            <span class="text-sm text-500 ml-auto flex align-items-center gap-1">
-                                ID: {{ product.shopify_variant_id || product.shopify_product_id }}
-                                <i class="pi pi-external-link text-xs"></i>
-                            </span>
-                        </a>
-
-                        <!-- New Multi-Store Links -->
-                        <div v-for="link in productIntegrations" :key="link.id">
-                             <a :href="getIntegrationUrl(link)" 
-                               target="_blank"
-                               class="flex align-items-center gap-2 text-green-600 bg-green-50 px-3 py-2 border-round border-1 border-green-200 w-full no-underline hover:bg-green-100 transition-colors cursor-pointer"
-                            >
-                                <i class="pi pi-check-circle"></i>
-                                <span class="font-medium">Linked</span>
-                                <span class="text-sm text-500 ml-auto flex align-items-center gap-1">
-                                    <i class="pi pi-external-link text-xs"></i>
-                                </span>
-                            </a>
+        <!-- Main Content Grid -->
+        <div class="grid">
+            <!-- Left Column: Image & Identification -->
+            <div class="col-12 lg:col-4 flex flex-column gap-4">
+                
+                <!-- Image Card -->
+                <div class="surface-card p-4 shadow-2 border-round">
+                    <div class="text-xl font-bold mb-4">Product Image</div>
+                    <div class="flex flex-column align-items-center gap-3">
+                        <div class="w-full border-1 surface-border border-round surface-50 flex align-items-center justify-content-center overflow-hidden relative" style="height: 300px;">
+                            <img v-if="product.image_url" :src="product.image_url" class="w-full h-full" style="object-fit: contain;" />
+                            <i v-else class="pi pi-image text-400 text-6xl"></i>
+                            
+                            <div v-if="uploadingImage" class="absolute top-0 left-0 w-full h-full bg-black-alpha-50 flex align-items-center justify-content-center">
+                                <i class="pi pi-spin pi-spinner text-white text-4xl"></i>
+                            </div>
                         </div>
                         
-                        <div v-if="!product.shopify_product_id && productIntegrations.length === 0" class="flex align-items-center gap-2 text-500 bg-gray-50 px-3 py-2 border-round border-1 surface-border w-full">
-                            <i class="pi pi-times-circle"></i>
-                            <span>Not Linked</span>
+                        <div class="flex gap-2 w-full">
+                            <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelect" />
+                            <Button label="Upload Image" icon="pi pi-upload" class="w-full" outlined @click="triggerFileUpload" :loading="uploadingImage" />
+                            <Button v-if="product.image_url" icon="pi pi-trash" severity="danger" outlined @click="product.image_url = null" />
+                        </div>
+                        <InputText v-model="product.image_url" placeholder="Or enter URL..." class="w-full text-sm" />
+                    </div>
+                </div>
+
+                <!-- Identification Card -->
+                <div class="surface-card p-4 shadow-2 border-round">
+                    <div class="text-xl font-bold mb-4">Identification</div>
+                    <div class="flex flex-column gap-3">
+                        <div class="field mb-0">
+                            <label class="text-500 font-medium text-sm">Vendor / Brand</label>
+                            <InputText v-model="product.vendor" class="w-full" />
+                        </div>
+                        <div class="field mb-0">
+                            <label class="text-500 font-medium text-sm">Product Type</label>
+                            <InputText v-model="product.product_type" class="w-full" />
+                        </div>
+                        <div class="field mb-0">
+                            <label class="text-500 font-medium text-sm">Product Barcode (UPC/EAN)</label>
+                            <div class="p-inputgroup">
+                                <span class="p-inputgroup-addon"><i class="pi pi-barcode"></i></span>
+                                <InputText v-model="product.barcode" />
+                            </div>
+                        </div>
+                        <div class="field mb-0">
+                            <label class="text-500 font-medium text-sm">Carton Barcode (ITF-14)</label>
+                            <div class="p-inputgroup">
+                                <span class="p-inputgroup-addon"><i class="pi pi-box"></i></span>
+                                <InputText v-model="product.carton_barcode" />
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Right Column: Details, Pricing, Integrations -->
+            <div class="col-12 lg:col-8 flex flex-column gap-4">
+                
+                <!-- General Info -->
+                <div class="surface-card p-4 shadow-2 border-round">
+                    <div class="text-xl font-bold mb-4">General Information</div>
+                    <div class="grid formgrid p-fluid">
+                        <div class="field col-12">
+                            <label class="font-bold">Description</label>
+                            <Textarea v-model="product.description" rows="4" autoResize />
+                        </div>
+                        <div class="field col-12 md:col-6">
+                            <label class="font-bold">Supplier</label>
+                            <Select v-model="product.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" placeholder="Select Supplier" filter showClear />
+                        </div>
+                        <div class="field col-12 md:col-6">
+                            <label class="font-bold">Carton Quantity</label>
+                            <InputNumber v-model="product.carton_qty" showButtons :min="1" suffix=" units" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pricing -->
+                <div class="surface-card p-4 shadow-2 border-round">
+                    <div class="text-xl font-bold mb-4">Pricing</div>
+                    <div class="grid formgrid p-fluid">
+                        <div class="field col-12 md:col-4">
+                            <label class="font-bold">Cost Price</label>
+                            <InputNumber v-model="product.cost_price" mode="currency" currency="USD" locale="en-US" />
+                        </div>
+                        <div class="field col-12 md:col-4">
+                            <label class="font-bold">Sale Price</label>
+                            <InputNumber v-model="product.list_price" mode="currency" currency="USD" locale="en-US" />
+                        </div>
+                        <div class="field col-12 md:col-4">
+                            <label class="font-bold">Compare-at Price</label>
+                            <InputNumber v-model="product.compare_at_price" mode="currency" currency="USD" locale="en-US" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Integrations -->
+                <div class="surface-card p-4 shadow-2 border-round">
+                    <div class="text-xl font-bold mb-4">Integrations</div>
+                    <div class="flex flex-column gap-2">
+                        <div v-if="product.shopify_product_id && getShopifyUrl()" class="flex align-items-center justify-content-between p-3 border-1 border-green-200 bg-green-50 border-round">
+                            <div class="flex align-items-center gap-3">
+                                <i class="pi pi-shopping-bag text-green-600 text-xl"></i>
+                                <div>
+                                    <div class="font-bold text-green-900">Shopify (Legacy)</div>
+                                    <div class="text-sm text-green-700">ID: {{ product.shopify_variant_id || product.shopify_product_id }}</div>
+                                </div>
+                            </div>
+                            <a :href="getShopifyUrl()" target="_blank" class="p-button p-component p-button-text p-button-sm p-button-success no-underline">
+                                <span class="p-button-icon p-button-icon-left pi pi-external-link"></span>
+                                <span class="p-button-label">View in Admin</span>
+                            </a>
+                        </div>
+
+                        <div v-for="link in productIntegrations" :key="link.id" class="flex align-items-center justify-content-between p-3 border-1 border-green-200 bg-green-50 border-round">
+                            <div class="flex align-items-center gap-3">
+                                <i class="pi pi-shopping-bag text-green-600 text-xl"></i>
+                                <div>
+                                    <div class="font-bold text-green-900">Shopify Store</div>
+                                    <div class="text-sm text-green-700">Linked</div>
+                                </div>
+                            </div>
+                            <a :href="getIntegrationUrl(link)" target="_blank" class="p-button p-component p-button-text p-button-sm p-button-success no-underline">
+                                <span class="p-button-icon p-button-icon-left pi pi-external-link"></span>
+                                <span class="p-button-label">View in Admin</span>
+                            </a>
+                        </div>
+
+                        <div v-if="!product.shopify_product_id && productIntegrations.length === 0" class="p-3 border-1 surface-border surface-50 border-round text-center text-500">
+                            No active integrations linked to this product.
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
