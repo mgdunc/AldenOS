@@ -1,5 +1,3 @@
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { formatCurrency } from '@/lib/formatCurrency'
 import { formatDate } from '@/lib/formatDate'
 
@@ -28,7 +26,10 @@ const CONFIG = {
     }
 }
 
-export const generatePoPdf = (po: any, lines: any[]) => {
+export const generatePoPdf = async (po: any, lines: any[]) => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+
     const doc = new jsPDF()
     
     // --- HEADER ---

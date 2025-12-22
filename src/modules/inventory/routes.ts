@@ -1,16 +1,13 @@
-import ProductsView from './views/products.vue'
-import ProductDetailView from './views/product-detail.vue'
-
 export const routes = [
   {
     path: '/products',
     name: 'products',
-    component: ProductsView
+    component: () => import('./views/products.vue')
   },
   {
     path: '/product/:id',
     name: 'product-detail',
-    component: ProductDetailView
+    component: () => import('./views/product-detail.vue')
   },
   {
     path: '/inventory/locations',

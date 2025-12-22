@@ -1,5 +1,3 @@
-import DashboardView from './views/dashboard.vue'
-import SettingsView from './views/settings.vue'
 import LoginView from './views/LoginView.vue'
 
 export const routes = [
@@ -12,12 +10,12 @@ export const routes = [
   {
     path: '/',
     name: 'dashboard',
-    component: DashboardView
+    component: () => import('./views/dashboard.vue')
   },
   {
     path: '/settings',
     name: 'settings',
-    component: SettingsView
+    component: () => import('./views/settings.vue')
   },
   {
     path: '/dev/logs',
