@@ -23,5 +23,8 @@ export default defineConfig({
   },
   build: {
     sourcemap: true, // Enable source maps for production debugging
+  },
+  optimizeDeps: {
+    include: ['@supabase/supabase-js']
   }
 })

@@ -15,10 +15,10 @@ const CONFIG = {
         phone: '+44 123 456 7890'
     },
     colors: {
-        primary: [41, 128, 185], // Blue
-        secondary: [127, 140, 141], // Grey
-        headerBg: [245, 245, 245],
-        text: [50, 50, 50]
+        primary: [41, 128, 185] as [number, number, number], // Blue
+        secondary: [127, 140, 141] as [number, number, number], // Grey
+        headerBg: [245, 245, 245] as [number, number, number],
+        text: [50, 50, 50] as [number, number, number]
     },
     fonts: {
         header: 'helvetica',

@@ -34,6 +34,7 @@ app.config.errorHandler = (err, instance, info) => {
 }
 
 // Enable DevTools in production for internal debugging
+// @ts-ignore
 app.config.devtools = true
 app.config.performance = true
 
