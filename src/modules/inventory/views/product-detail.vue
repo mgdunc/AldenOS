@@ -41,6 +41,7 @@ const loading = ref(true)
 const saving = ref(false)
 const uploadingImage = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const editMode = ref(false)
 
 const totalOnOrder = ref(0)
 const totalRequired = ref(0) 
@@ -206,8 +207,14 @@ const updateProduct = async () => {
         toast.add({ severity: 'error', summary: 'Error', detail: error.message })
     } else {
         toast.add({ severity: 'success', summary: 'Saved', detail: 'Product updated successfully' })
+        editMode.value = false
     }
     saving.value = false
+}
+
+const cancelEdit = () => {
+    editMode.value = false
+    loadData() // Reload to discard changes
 }
 
 const triggerFileUpload = () => {
@@ -339,75 +346,108 @@ const getIntegrationUrl = (link: any) => {
 
     <div v-else-if="product" class="flex flex-column gap-4">
         
-        <!-- Header -->
-        <div class="surface-card p-4 shadow-2 border-round flex justify-content-between align-items-center">
-            <div>
-                <div class="text-500 text-sm mb-1">SKU: {{ product.sku }}</div>
-                <div class="flex align-items-center gap-3">
-                    <h1 class="text-3xl font-bold m-0">{{ product.name }}</h1>
-                    <Tag :value="product.status?.toUpperCase()" :severity="getStatusSeverity(product.status)" />
+        <!-- Header with Hero Image -->
+        <div class="surface-card shadow-2 border-round overflow-hidden">
+            <div class="flex flex-column md:flex-row">
+                <!-- Product Image Section -->
+                <div class="w-full md:w-15rem lg:w-20rem surface-100 flex align-items-center justify-content-center p-4 relative" style="min-height: 200px;">
+                    <img v-if="product.image_url" :src="product.image_url" class="max-w-full max-h-12rem" style="object-fit: contain;" />
+                    <i v-else class="pi pi-box text-400 text-6xl"></i>
+                    <div v-if="uploadingImage" class="absolute top-0 left-0 w-full h-full bg-black-alpha-50 flex align-items-center justify-content-center">
+                        <i class="pi pi-spin pi-spinner text-white text-4xl"></i>
+                    </div>
+                    <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelect" />
+                    <Button icon="pi pi-camera" rounded class="absolute" style="bottom: 1rem; right: 1rem;" @click="triggerFileUpload" :loading="uploadingImage" v-tooltip="'Change Image'" />
                 </div>
-            </div>
-            <div class="flex gap-2">
-                <Button label="Save Changes" icon="pi pi-save" @click="updateProduct" :loading="saving" />
-                <Button label="Adjust Stock" icon="pi pi-sliders-h" severity="info" @click="showAdjustDialog = true" />
+                
+                <!-- Product Info Section -->
+                <div class="flex-1 p-4 flex flex-column justify-content-between">
+                    <div>
+                        <div class="flex align-items-center gap-2 mb-2">
+                            <span class="text-500 font-mono text-sm bg-gray-100 px-2 py-1 border-round">{{ product.sku }}</span>
+                            <Tag :value="product.status?.toUpperCase()" :severity="getStatusSeverity(product.status)" />
+                        </div>
+                        <h1 class="text-2xl md:text-3xl font-bold m-0 text-900 mb-2">{{ product.name }}</h1>
+                        <p v-if="product.description" class="text-600 m-0 line-clamp-2 text-sm">{{ product.description }}</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <Button v-if="!editMode" label="Edit Product" icon="pi pi-pencil" severity="secondary" outlined @click="editMode = true" />
+                        <Button v-if="editMode" label="Save Changes" icon="pi pi-save" @click="updateProduct" :loading="saving" />
+                        <Button v-if="editMode" label="Cancel" icon="pi pi-times" severity="secondary" text @click="cancelEdit" />
+                        <Button label="Adjust Stock" icon="pi pi-sliders-h" severity="secondary" outlined @click="showAdjustDialog = true" />
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Key Stats Row -->
+        <!-- Key Stats Row - Compact Cards -->
         <div class="grid">
-            <div class="col-12 md:col-2 lg:col">
-                <div class="surface-card shadow-2 p-3 border-round border-left-3 border-blue-500 h-full">
-                    <div class="flex justify-content-between mb-3">
-                        <div class="text-500 font-medium">Total On Hand</div>
-                        <Button icon="pi pi-search" text rounded size="small" class="p-0 w-2rem h-2rem" @click="showStockDialog = true" />
-                    </div>
-                    <div class="text-900 text-3xl font-bold">{{ product.total_qoh }}</div>
-                </div>
-            </div>
-
-            <div class="col-12 md:col-2 lg:col">
-                <div class="surface-card shadow-2 p-3 border-round border-left-3 border-green-500 h-full">
-                    <div class="text-500 font-medium mb-3">Available to Sell</div>
-                    <div class="text-900 text-3xl font-bold">{{ product.total_available }}</div>
-                </div>
-            </div>
-
-            <div class="col-12 md:col-2 lg:col">
-                <div class="surface-card shadow-2 p-3 border-round border-left-3 border-orange-500 h-full">
-                    <div class="flex justify-content-between mb-3">
-                        <div class="text-500 font-medium">Reserved</div>
-                        <i class="pi pi-lock text-orange-500 text-xl"></i>
-                    </div>
-                    <div class="flex justify-content-between align-items-end">
-                        <div class="text-900 text-3xl font-bold">{{ product.total_reserved }}</div>
-                        <Button label="View" class="p-0" text size="small" @click="showReservedDialog = true" />
+            <div class="col-6 md:col-4 lg:col">
+                <div class="surface-card shadow-1 p-3 border-round h-full cursor-pointer hover:shadow-3 transition-all transition-duration-200" @click="showStockDialog = true">
+                    <div class="flex align-items-center gap-3">
+                        <div class="flex align-items-center justify-content-center bg-blue-100 border-round" style="width: 3rem; height: 3rem;">
+                            <i class="pi pi-box text-blue-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-500 text-sm font-medium">On Hand</div>
+                            <div class="text-900 text-2xl font-bold">{{ product.total_qoh }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-12 md:col-2 lg:col">
-                <div class="surface-card shadow-2 p-3 border-round border-left-3 border-purple-500 h-full">
-                    <div class="flex justify-content-between mb-3">
-                        <div class="text-500 font-medium">On Order</div>
-                        <i class="pi pi-truck text-purple-500 text-xl"></i>
-                    </div>
-                    <div class="flex justify-content-between align-items-end">
-                        <div class="text-900 text-3xl font-bold">{{ totalOnOrder }}</div>
-                        <Button label="View" class="p-0" text size="small" @click="showIncomingDialog = true" />
+            <div class="col-6 md:col-4 lg:col">
+                <div class="surface-card shadow-1 p-3 border-round h-full">
+                    <div class="flex align-items-center gap-3">
+                        <div class="flex align-items-center justify-content-center bg-green-100 border-round" style="width: 3rem; height: 3rem;">
+                            <i class="pi pi-check-circle text-green-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-500 text-sm font-medium">Available</div>
+                            <div class="text-green-600 text-2xl font-bold">{{ product.total_available }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-12 md:col-2 lg:col">
-                <div class="surface-card shadow-2 p-3 border-round border-left-3 border-red-500 h-full">
-                    <div class="flex justify-content-between mb-3">
-                        <div class="text-500 font-medium">Required</div>
-                        <i class="pi pi-exclamation-circle text-red-500 text-xl"></i>
+            <div class="col-6 md:col-4 lg:col">
+                <div class="surface-card shadow-1 p-3 border-round h-full cursor-pointer hover:shadow-3 transition-all transition-duration-200" @click="showReservedDialog = true">
+                    <div class="flex align-items-center gap-3">
+                        <div class="flex align-items-center justify-content-center bg-orange-100 border-round" style="width: 3rem; height: 3rem;">
+                            <i class="pi pi-lock text-orange-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-500 text-sm font-medium">Reserved</div>
+                            <div class="text-orange-600 text-2xl font-bold">{{ product.total_reserved }}</div>
+                        </div>
                     </div>
-                    <div class="flex justify-content-between align-items-end">
-                        <div class="text-900 text-3xl font-bold">{{ totalRequired }}</div>
-                        <Button label="View" class="p-0" text size="small" @click="showRequiredDialog = true" />
+                </div>
+            </div>
+
+            <div class="col-6 md:col-4 lg:col">
+                <div class="surface-card shadow-1 p-3 border-round h-full cursor-pointer hover:shadow-3 transition-all transition-duration-200" @click="showIncomingDialog = true">
+                    <div class="flex align-items-center gap-3">
+                        <div class="flex align-items-center justify-content-center bg-purple-100 border-round" style="width: 3rem; height: 3rem;">
+                            <i class="pi pi-truck text-purple-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-500 text-sm font-medium">On Order</div>
+                            <div class="text-purple-600 text-2xl font-bold">{{ totalOnOrder }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 md:col-4 lg:col">
+                <div class="surface-card shadow-1 p-3 border-round h-full cursor-pointer hover:shadow-3 transition-all transition-duration-200" @click="showRequiredDialog = true">
+                    <div class="flex align-items-center gap-3">
+                        <div class="flex align-items-center justify-content-center border-round" :class="totalRequired > product.total_available ? 'bg-red-100' : 'bg-gray-100'" style="width: 3rem; height: 3rem;">
+                            <i class="pi pi-exclamation-circle text-xl" :class="totalRequired > product.total_available ? 'text-red-600' : 'text-gray-500'"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-500 text-sm font-medium">Required</div>
+                            <div class="text-2xl font-bold" :class="totalRequired > product.total_available ? 'text-red-600' : 'text-900'">{{ totalRequired }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -415,166 +455,207 @@ const getIntegrationUrl = (link: any) => {
 
         <!-- Main Content Grid -->
         <div class="grid">
-            <!-- Left Column: Image & Details -->
-            <div class="col-12 lg:col-4 flex flex-column gap-4">
-                
-                <!-- Image Card -->
-                <div class="surface-card p-4 shadow-2 border-round">
-                    <div class="text-xl font-bold mb-4">Product Image</div>
-                    <div class="flex flex-column align-items-center gap-3">
-                        <div class="w-full border-1 surface-border border-round surface-50 flex align-items-center justify-content-center overflow-hidden relative" style="height: 300px;">
-                            <img v-if="product.image_url" :src="product.image_url" class="w-full h-full" style="object-fit: contain;" />
-                            <i v-else class="pi pi-image text-400 text-6xl"></i>
-                            
-                            <div v-if="uploadingImage" class="absolute top-0 left-0 w-full h-full bg-black-alpha-50 flex align-items-center justify-content-center">
-                                <i class="pi pi-spin pi-spinner text-white text-4xl"></i>
-                            </div>
-                        </div>
-                        
-                        <div class="flex gap-2 w-full">
-                            <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelect" />
-                            <Button v-if="!product.image_url" label="Upload Image" icon="pi pi-upload" class="w-full" outlined @click="triggerFileUpload" :loading="uploadingImage" />
-                            <Button v-else label="Remove Image" icon="pi pi-trash" severity="danger" outlined class="w-full" @click="product.image_url = null" />
-                        </div>
-                        <InputText v-if="!product.image_url" v-model="product.image_url" placeholder="Or enter URL..." class="w-full text-sm" />
-                    </div>
-                </div>
-
-                <!-- Product Details Card -->
-                <div class="surface-card p-4 shadow-2 border-round">
-                    <div class="text-xl font-bold mb-4">Product Details</div>
-                    <div class="flex flex-column gap-3">
-                        <div class="field mb-0 flex flex-column gap-2">
-                            <label class="font-bold">Supplier</label>
-                            <Select v-model="product.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" placeholder="Select Supplier" filter showClear class="w-full" />
-                        </div>
-                        <div class="field mb-0 flex flex-column gap-2">
-                            <label class="font-bold">Carton Quantity</label>
-                            <InputNumber v-model="product.carton_qty" showButtons :min="1" suffix=" units" class="w-full" />
-                        </div>
-                        <div class="field mb-0 flex flex-column gap-2">
-                            <label class="font-bold">Vendor / Brand</label>
-                            <InputText v-model="product.vendor" class="w-full" />
-                        </div>
-                        <div class="field mb-0 flex flex-column gap-2">
-                            <label class="font-bold">Product Type</label>
-                            <InputText v-model="product.product_type" class="w-full" />
-                        </div>
-                        <div class="field mb-0 flex flex-column gap-2">
-                            <label class="font-bold">Product Barcode (UPC/EAN)</label>
-                            <div class="p-inputgroup">
-                                <span class="p-inputgroup-addon"><i class="pi pi-barcode"></i></span>
-                                <InputText v-model="product.barcode" />
-                            </div>
-                        </div>
-                        <div class="field mb-0 flex flex-column gap-2">
-                            <label class="font-bold">Carton Barcode (ITF-14)</label>
-                            <div class="p-inputgroup">
-                                <span class="p-inputgroup-addon"><i class="pi pi-box"></i></span>
-                                <InputText v-model="product.carton_barcode" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column: Details, Pricing, Integrations -->
+            <!-- Left Column: Details -->
             <div class="col-12 lg:col-8 flex flex-column gap-4">
                 
-                <!-- General Info -->
+                <!-- Product Details & Pricing Combined -->
                 <div class="surface-card p-4 shadow-2 border-round">
-                    <div class="text-xl font-bold mb-4">General Information</div>
-                    <div class="grid formgrid p-fluid">
-                        <div class="field col-12 flex flex-column gap-2">
-                            <label class="font-bold">Description</label>
-                            <Textarea v-model="product.description" rows="4" autoResize />
+                    <div class="flex align-items-center justify-content-between mb-4">
+                        <div class="flex align-items-center gap-2">
+                            <i class="pi pi-info-circle text-primary text-xl"></i>
+                            <span class="text-xl font-bold">Product Information</span>
+                        </div>
+                        <Tag v-if="editMode" value="EDITING" severity="warn" icon="pi pi-pencil" />
+                    </div>
+                    
+                    <!-- READ-ONLY VIEW -->
+                    <div v-if="!editMode" class="grid">
+                        <div class="col-12 mb-3" v-if="product.description">
+                            <div class="text-500 text-sm font-medium mb-1">Description</div>
+                            <div class="text-900">{{ product.description }}</div>
+                        </div>
+                        
+                        <Divider class="col-12 my-2" />
+                        
+                        <div class="col-12">
+                            <div class="text-sm font-bold text-500 mb-3">PRICING</div>
+                        </div>
+                        <div class="col-6 md:col-3 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">Cost Price</div>
+                            <div class="text-900 font-bold">{{ formatCurrency(product.cost_price) }}</div>
+                        </div>
+                        <div class="col-6 md:col-3 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">List Price</div>
+                            <div class="text-900 font-bold">{{ formatCurrency(product.retail_price) }}</div>
+                        </div>
+                        <div class="col-6 md:col-3 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">Sale Price</div>
+                            <div class="text-900 font-bold">{{ formatCurrency(product.list_price) }}</div>
+                        </div>
+                        <div class="col-6 md:col-3 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">Compare-at</div>
+                            <div class="text-900 font-bold">{{ formatCurrency(product.compare_at_price) }}</div>
+                        </div>
+                        
+                        <Divider class="col-12 my-2" />
+                        
+                        <div class="col-12">
+                            <div class="text-sm font-bold text-500 mb-3">IDENTIFIERS & ATTRIBUTES</div>
+                        </div>
+                        <div class="col-6 md:col-4 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">Supplier</div>
+                            <div class="text-900">{{ suppliers.find(s => s.id === product.supplier_id)?.name || '-' }}</div>
+                        </div>
+                        <div class="col-6 md:col-4 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">Vendor / Brand</div>
+                            <div class="text-900">{{ product.vendor || '-' }}</div>
+                        </div>
+                        <div class="col-6 md:col-4 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">Product Type</div>
+                            <div class="text-900">{{ product.product_type || '-' }}</div>
+                        </div>
+                        <div class="col-6 md:col-4 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1"><i class="pi pi-barcode mr-1"></i>UPC/EAN</div>
+                            <div class="text-900 font-mono">{{ product.barcode || '-' }}</div>
+                        </div>
+                        <div class="col-6 md:col-4 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1"><i class="pi pi-box mr-1"></i>Carton Barcode</div>
+                            <div class="text-900 font-mono">{{ product.carton_barcode || '-' }}</div>
+                        </div>
+                        <div class="col-6 md:col-4 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">Carton Quantity</div>
+                            <div class="text-900">{{ product.carton_qty || '-' }} units</div>
+                        </div>
+                    </div>
+                    
+                    <!-- EDIT MODE -->
+                    <div v-else class="grid formgrid">
+                        <div class="field col-12">
+                            <label class="font-bold text-sm text-500 mb-2 block">Description</label>
+                            <Textarea v-model="product.description" rows="3" autoResize class="w-full" placeholder="Enter product description..." />
+                        </div>
+                        
+                        <Divider class="col-12 my-2" />
+                        
+                        <div class="col-12">
+                            <div class="text-sm font-bold text-500 mb-3">PRICING</div>
+                        </div>
+                        <div class="field col-6 md:col-3">
+                            <label class="font-medium text-sm text-700 mb-2 block">Cost Price</label>
+                            <InputNumber v-model="product.cost_price" mode="currency" currency="GBP" locale="en-GB" class="w-full" inputClass="text-right" />
+                        </div>
+                        <div class="field col-6 md:col-3">
+                            <label class="font-medium text-sm text-700 mb-2 block">List Price</label>
+                            <InputNumber v-model="product.retail_price" mode="currency" currency="GBP" locale="en-GB" class="w-full" inputClass="text-right" />
+                        </div>
+                        <div class="field col-6 md:col-3">
+                            <label class="font-medium text-sm text-700 mb-2 block">Sale Price</label>
+                            <InputNumber v-model="product.list_price" mode="currency" currency="GBP" locale="en-GB" class="w-full" inputClass="text-right" />
+                        </div>
+                        <div class="field col-6 md:col-3">
+                            <label class="font-medium text-sm text-700 mb-2 block">Compare-at</label>
+                            <InputNumber v-model="product.compare_at_price" mode="currency" currency="GBP" locale="en-GB" class="w-full" inputClass="text-right" />
+                        </div>
+                        
+                        <Divider class="col-12 my-2" />
+                        
+                        <div class="col-12">
+                            <div class="text-sm font-bold text-500 mb-3">IDENTIFIERS & ATTRIBUTES</div>
+                        </div>
+                        <div class="field col-12 md:col-6">
+                            <label class="font-medium text-sm text-700 mb-2 block">Supplier</label>
+                            <Select v-model="product.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" placeholder="Select Supplier" filter showClear class="w-full" />
+                        </div>
+                        <div class="field col-6 md:col-3">
+                            <label class="font-medium text-sm text-700 mb-2 block">Vendor / Brand</label>
+                            <InputText v-model="product.vendor" class="w-full" />
+                        </div>
+                        <div class="field col-6 md:col-3">
+                            <label class="font-medium text-sm text-700 mb-2 block">Product Type</label>
+                            <InputText v-model="product.product_type" class="w-full" />
+                        </div>
+                        <div class="field col-6 md:col-4">
+                            <label class="font-medium text-sm text-700 mb-2 block">
+                                <i class="pi pi-barcode mr-1"></i>UPC/EAN Barcode
+                            </label>
+                            <InputText v-model="product.barcode" class="w-full font-mono" />
+                        </div>
+                        <div class="field col-6 md:col-4">
+                            <label class="font-medium text-sm text-700 mb-2 block">
+                                <i class="pi pi-box mr-1"></i>Carton Barcode
+                            </label>
+                            <InputText v-model="product.carton_barcode" class="w-full font-mono" />
+                        </div>
+                        <div class="field col-6 md:col-4">
+                            <label class="font-medium text-sm text-700 mb-2 block">Carton Quantity</label>
+                            <InputNumber v-model="product.carton_qty" showButtons :min="1" suffix=" units" class="w-full" />
                         </div>
                     </div>
                 </div>
 
-                <!-- Pricing -->
-                <div class="surface-card p-4 shadow-2 border-round">
-                    <div class="text-xl font-bold mb-4">Pricing</div>
-                    <div class="grid formgrid p-fluid">
-                        <div class="field col-12 md:col-6 flex flex-column gap-2">
-                            <label class="font-bold">List Price</label>
-                            <InputNumber v-model="product.retail_price" mode="currency" currency="GBP" locale="en-GB" />
-                        </div>
-                        <div class="field col-12 md:col-6 flex flex-column gap-2">
-                            <label class="font-bold">Cost Price</label>
-                            <InputNumber v-model="product.cost_price" mode="currency" currency="GBP" locale="en-GB" />
-                        </div>
-                        <div class="field col-12 md:col-6 flex flex-column gap-2">
-                            <label class="font-bold">Sale Price</label>
-                            <InputNumber v-model="product.list_price" mode="currency" currency="GBP" locale="en-GB" />
-                        </div>
-                        <div class="field col-12 md:col-6 flex flex-column gap-2">
-                            <label class="font-bold">Compare-at Price</label>
-                            <InputNumber v-model="product.compare_at_price" mode="currency" currency="GBP" locale="en-GB" />
+                <!-- Movement History -->
+                <div class="surface-card shadow-2 border-round overflow-hidden">
+                    <div class="flex align-items-center justify-content-between p-4 border-bottom-1 surface-border">
+                        <div class="flex align-items-center gap-2">
+                            <i class="pi pi-history text-primary text-xl"></i>
+                            <span class="text-xl font-bold">Movement History</span>
                         </div>
                     </div>
+                    <DataTable :value="history" size="small" stripedRows paginator :rows="10" class="border-noround">
+                        <template #empty><div class="text-center text-500 py-4">No movement history found.</div></template>
+                        <Column field="created_at" header="Date" style="width: 180px"><template #body="{ data }"><span class="text-sm">{{ formatDateTime(data.created_at) }}</span></template></Column>
+                        <Column field="transaction_type" header="Type" style="width: 120px"><template #body="{ data }"><Tag :value="data.transaction_type" :severity="getTypeSeverity(data.transaction_type)" class="text-xs" /></template></Column>
+                        <Column field="locations.name" header="Location" />
+                        <Column field="change_qoh" header="Qty" style="width: 80px"><template #body="{ data }"><span class="font-bold" :class="data.change_qoh > 0 ? 'text-green-600' : 'text-red-500'">{{ data.change_qoh > 0 ? '+' : '' }}{{ data.change_qoh }}</span></template></Column>
+                        <Column field="reference_id" header="Reference" style="width: 100px"><template #body="{ data }"><router-link v-if="getReferenceLink(data)" :to="getReferenceLink(data) as string" class="text-primary no-underline hover:underline">View</router-link><span v-else class="text-400">-</span></template></Column>
+                    </DataTable>
                 </div>
-
-                <!-- Integrations -->
-                <div class="surface-card p-4 shadow-2 border-round">
-                    <div class="text-xl font-bold mb-4">Integrations</div>
-                    <div class="flex flex-column gap-2">
-                        <div v-if="product.shopify_product_id && getShopifyUrl()" class="flex align-items-center justify-content-between p-3 border-1 border-green-200 bg-green-50 border-round">
-                            <div class="flex align-items-center gap-3">
-                                <i class="pi pi-shopping-bag text-green-600 text-xl"></i>
-                                <div>
-                                    <div class="font-bold text-green-900">Shopify (Legacy)</div>
-                                    <div class="text-sm text-green-700">ID: {{ product.shopify_variant_id || product.shopify_product_id }}</div>
-                                </div>
-                            </div>
-                            <a :href="getShopifyUrl()" target="_blank" class="p-button p-component p-button-text p-button-sm p-button-success no-underline">
-                                <span class="p-button-icon p-button-icon-left pi pi-external-link"></span>
-                                <span class="p-button-label">View in Admin</span>
-                            </a>
-                        </div>
-
-                        <div v-for="link in productIntegrations" :key="link.id" class="flex align-items-center justify-content-between p-3 border-1 border-green-200 bg-green-50 border-round">
-                            <div class="flex align-items-center gap-3">
-                                <i class="pi pi-shopping-bag text-green-600 text-xl"></i>
-                                <div>
-                                    <div class="font-bold text-green-900">Shopify Store</div>
-                                    <div class="text-sm text-green-700">Linked</div>
-                                </div>
-                            </div>
-                            <a :href="getIntegrationUrl(link)" target="_blank" class="p-button p-component p-button-text p-button-sm p-button-success no-underline">
-                                <span class="p-button-icon p-button-icon-left pi pi-external-link"></span>
-                                <span class="p-button-label">View in Admin</span>
-                            </a>
-                        </div>
-
-                        <div v-if="!product.shopify_product_id && productIntegrations.length === 0" class="p-3 border-1 surface-border surface-50 border-round text-center text-500">
-                            No active integrations linked to this product.
-                        </div>
-                    </div>
-                </div>
-
             </div>
-        </div>
 
-        <!-- Movement History -->
-        <Panel header="Movement History">
-            <DataTable :value="history" size="small" stripedRows paginator :rows="15">
-                <template #empty>No movement history found.</template>
-                <Column field="created_at" header="Date"><template #body="{ data }"><span class="text-sm">{{ formatDateTime(data.created_at) }}</span></template></Column>
-                <Column field="transaction_type" header="Type"><template #body="{ data }"><Tag :value="data.transaction_type" :severity="getTypeSeverity(data.transaction_type)" /></template></Column>
-                <Column field="locations.name" header="Loc" />
-                <Column field="change_qoh" header="Qty"><template #body="{ data }"><span :class="data.change_qoh > 0 ? 'text-green-600' : 'text-red-500'">{{ data.change_qoh }}</span></template></Column>
-                <Column field="reference_id" header="Ref"><template #body="{ data }"><router-link v-if="getReferenceLink(data)" :to="getReferenceLink(data) as string" class="text-primary">{{ data.reference_id ? 'View' : '-' }}</router-link></template></Column>
-            </DataTable>
-        </Panel>
+            <!-- Right Column: Integrations & Timeline -->
+            <div class="col-12 lg:col-4 flex flex-column gap-4">
+                
+                <!-- Integrations Card -->
+                <div class="surface-card p-4 shadow-2 border-round">
+                    <div class="flex align-items-center gap-2 mb-4">
+                        <i class="pi pi-link text-primary text-xl"></i>
+                        <span class="text-xl font-bold">Integrations</span>
+                    </div>
+                    <div class="flex flex-column gap-2">
+                        <a v-if="product.shopify_product_id && getShopifyUrl()" :href="getShopifyUrl()" target="_blank" class="flex align-items-center gap-3 p-3 border-1 border-green-200 bg-green-50 border-round no-underline hover:bg-green-100 transition-colors transition-duration-200">
+                            <i class="pi pi-shopping-bag text-green-600 text-2xl"></i>
+                            <div class="flex-1">
+                                <div class="font-bold text-green-900">Shopify</div>
+                                <div class="text-xs text-green-700 font-mono">ID: {{ product.shopify_variant_id || product.shopify_product_id }}</div>
+                            </div>
+                            <i class="pi pi-external-link text-green-600"></i>
+                        </a>
 
-        <!-- Timeline Section -->
-        <div class="surface-card shadow-2 border-round overflow-hidden" style="height: 600px;">
-            <TimelineSidebar 
-                v-if="product" 
-                :entity-id="product.id" 
-                entity-type="product" 
-            />
+                        <a v-for="link in productIntegrations" :key="link.id" :href="getIntegrationUrl(link)" target="_blank" class="flex align-items-center gap-3 p-3 border-1 border-green-200 bg-green-50 border-round no-underline hover:bg-green-100 transition-colors transition-duration-200">
+                            <i class="pi pi-shopping-bag text-green-600 text-2xl"></i>
+                            <div class="flex-1">
+                                <div class="font-bold text-green-900">Shopify Store</div>
+                                <div class="text-xs text-green-700">Linked</div>
+                            </div>
+                            <i class="pi pi-external-link text-green-600"></i>
+                        </a>
+
+                        <div v-if="!product.shopify_product_id && productIntegrations.length === 0" class="p-4 border-1 border-dashed surface-border border-round text-center">
+                            <i class="pi pi-link-off text-400 text-3xl mb-2"></i>
+                            <div class="text-500 text-sm">No integrations linked</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timeline Section -->
+                <div class="surface-card shadow-2 border-round overflow-hidden flex-1" style="min-height: 400px;">
+                    <TimelineSidebar 
+                        v-if="product" 
+                        :entity-id="product.id" 
+                        entity-type="product" 
+                    />
+                </div>
+            </div>
         </div>
     </div>
 

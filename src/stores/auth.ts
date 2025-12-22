@@ -27,10 +27,26 @@ export const useAuthStore = defineStore('auth', () => {
     
     initPromise = (async () => {
       try {
-        // Get initial session
+        // Get initial session with timeout
         console.log('Auth: Getting session...')
-        const { data, error } = await supabase.auth.getSession()
-        if (error) console.error('Auth: Session error', error)
+        const sessionPromise = supabase.auth.getSession()
+        // Increased timeout to 10s to handle slower local environments or network latency
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Session fetch timeout')), 10000)
+        )
+        
+        const { data, error } = await Promise.race([sessionPromise, timeoutPromise])
+          .catch(err => {
+            console.warn('Auth: Session fetch failed or timed out:', err.message)
+            return { data: { session: null }, error: err }
+          }) as Awaited<typeof sessionPromise>
+          
+        if (error) {
+            // Only log as error if it's not a timeout
+            if (error.message !== 'Session fetch timeout') {
+                console.error('Auth: Session error', error)
+            }
+        }
         
         session.value = data.session
         user.value = data.session?.user ?? null
