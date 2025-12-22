@@ -23,6 +23,8 @@
     "@tiptap/vue-3": "^3.13.0",
     "@types/papaparse": "^5.5.2",
     "exceljs": "^4.4.0",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
     "papaparse": "^5.5.3",
     "pinia": "^3.0.4",
     "primeflex": "^4.0.0",

@@ -29,6 +29,7 @@ import TabPanel from 'primevue/tabpanel'
 
 import { getStatusSeverity } from '@/lib/statusHelpers'
 import { formatDate } from '@/lib/formatDate'
+import { generatePoPdf } from '@/modules/purchasing/utils/generatePoPdf'
 
 import AttachmentGallery from '@/modules/core/components/AttachmentGallery.vue'
 
@@ -143,7 +144,9 @@ const viewReceiptsBreakdown = async (product: any) => {
     receiptsLoading.value = false
 }
 
-const printOrder = () => { window.print() }
+const printOrder = () => { 
+    generatePoPdf(po.value, lines.value)
+}
 
 const getReceiptProgress = (receipt: any) => {
     if (!receipt.inventory_receipt_lines) return '-'
