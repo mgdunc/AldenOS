@@ -41,20 +41,20 @@ export const useAuthStore = defineStore('auth', () => {
                 session.value = _session
                 user.value = _session?.user ?? null
                 
-                if (user.value) {
-                    // If we have a user, try to fetch profile
-                    // We don't block the init on this unless necessary, but it's good practice
-                    if (!profile.value) {
-                        await fetchProfile()
-                    }
-                } else {
-                    profile.value = null
-                }
-                
-                // Resolve the initialization promise on the first event
+                // Resolve the initialization promise immediately on the first event
+                // We do NOT wait for profile fetching to avoid blocking the app load
                 if (!resolved) {
                     resolved = true
                     resolve()
+                }
+
+                if (user.value) {
+                    if (!profile.value) {
+                        // Fetch profile in background
+                        fetchProfile().catch(err => console.error('Auth: Profile fetch failed', err))
+                    }
+                } else {
+                    profile.value = null
                 }
             })
         })
