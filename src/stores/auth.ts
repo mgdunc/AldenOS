@@ -27,49 +27,45 @@ export const useAuthStore = defineStore('auth', () => {
     
     initPromise = (async () => {
       try {
-        // Get initial session with timeout
-        console.log('Auth: Getting session...')
-        const sessionPromise = supabase.auth.getSession()
-        // Increased timeout to 10s to handle slower local environments or network latency
-        const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Session fetch timeout')), 10000)
+        console.log('Auth: Initializing via onAuthStateChange...')
+        
+        // Use onAuthStateChange to get the initial session. 
+        // This is often more reliable than getSession() which can hang in some environments.
+        // The callback is fired immediately with the current session (from storage).
+        
+        const initComplete = new Promise<void>((resolve) => {
+            let resolved = false
+            
+            supabase.auth.onAuthStateChange(async (event, _session) => {
+                console.log('Auth: State change', event)
+                session.value = _session
+                user.value = _session?.user ?? null
+                
+                if (user.value) {
+                    // If we have a user, try to fetch profile
+                    // We don't block the init on this unless necessary, but it's good practice
+                    if (!profile.value) {
+                        await fetchProfile()
+                    }
+                } else {
+                    profile.value = null
+                }
+                
+                // Resolve the initialization promise on the first event
+                if (!resolved) {
+                    resolved = true
+                    resolve()
+                }
+            })
+        })
+
+        // Race with timeout (10s)
+        const timeoutPromise = new Promise<void>((_, reject) => 
+          setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
         )
         
-        const { data, error } = await Promise.race([sessionPromise, timeoutPromise])
-          .catch(err => {
-            console.warn('Auth: Session fetch failed or timed out:', err.message)
-            return { data: { session: null }, error: err }
-          }) as Awaited<typeof sessionPromise>
-          
-        if (error) {
-            // Only log as error if it's not a timeout
-            if (error.message !== 'Session fetch timeout') {
-                console.error('Auth: Session error', error)
-            }
-        }
-        
-        session.value = data.session
-        user.value = data.session?.user ?? null
-        console.log('Auth: Session retrieved', user.value?.id)
+        await Promise.race([initComplete, timeoutPromise])
 
-        if (user.value) {
-          console.log('Auth: Fetching profile...')
-          await fetchProfile()
-          console.log('Auth: Profile fetched')
-        }
-
-        // Listen for changes
-        supabase.auth.onAuthStateChange(async (event, _session) => {
-          console.log('Auth: State change', event)
-          session.value = _session
-          user.value = _session?.user ?? null
-          
-          if (user.value) {
-            await fetchProfile()
-          } else {
-            profile.value = null
-          }
-        })
       } catch (e) {
         console.error('Auth: Initialization failed', e)
       } finally {
