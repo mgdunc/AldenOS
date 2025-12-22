@@ -33,4 +33,8 @@ app.config.errorHandler = (err, instance, info) => {
     // You could also send this to a logging service like Sentry
 }
 
+// Enable DevTools in production for internal debugging
+app.config.devtools = true
+app.config.performance = true
+
 app.mount('#app')

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SpeedInsights } from "@vercel/speed-insights/vue"
 import { ref, onMounted, onErrorCaptured } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -93,6 +94,7 @@ const items = ref([
 <template>
     <Toast position="top-right" :life="3000" />
     <ConfirmDialog />
+    <SpeedInsights />
     
     <div v-if="authStore.loading" class="flex align-items-center justify-content-center h-screen w-screen surface-ground">
         <div class="flex flex-column align-items-center gap-3">
