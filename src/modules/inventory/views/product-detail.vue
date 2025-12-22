@@ -195,6 +195,7 @@ const updateProduct = async () => {
         carton_barcode: product.value.carton_barcode,
         description: product.value.description,
         list_price: product.value.list_price,
+        retail_price: product.value.retail_price,
         compare_at_price: product.value.compare_at_price,
         product_type: product.value.product_type,
         vendor: product.value.vendor,
@@ -414,7 +415,7 @@ const getIntegrationUrl = (link: any) => {
 
         <!-- Main Content Grid -->
         <div class="grid">
-            <!-- Left Column: Image & Identification -->
+            <!-- Left Column: Image & Details -->
             <div class="col-12 lg:col-4 flex flex-column gap-4">
                 
                 <!-- Image Card -->
@@ -439,27 +440,35 @@ const getIntegrationUrl = (link: any) => {
                     </div>
                 </div>
 
-                <!-- Identification Card -->
+                <!-- Product Details Card -->
                 <div class="surface-card p-4 shadow-2 border-round">
-                    <div class="text-xl font-bold mb-4">Identification</div>
+                    <div class="text-xl font-bold mb-4">Product Details</div>
                     <div class="flex flex-column gap-3">
-                        <div class="field mb-0">
-                            <label class="text-500 font-medium text-sm">Vendor / Brand</label>
+                        <div class="field mb-0 flex flex-column gap-2">
+                            <label class="font-bold">Supplier</label>
+                            <Select v-model="product.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" placeholder="Select Supplier" filter showClear class="w-full" />
+                        </div>
+                        <div class="field mb-0 flex flex-column gap-2">
+                            <label class="font-bold">Carton Quantity</label>
+                            <InputNumber v-model="product.carton_qty" showButtons :min="1" suffix=" units" class="w-full" />
+                        </div>
+                        <div class="field mb-0 flex flex-column gap-2">
+                            <label class="font-bold">Vendor / Brand</label>
                             <InputText v-model="product.vendor" class="w-full" />
                         </div>
-                        <div class="field mb-0">
-                            <label class="text-500 font-medium text-sm">Product Type</label>
+                        <div class="field mb-0 flex flex-column gap-2">
+                            <label class="font-bold">Product Type</label>
                             <InputText v-model="product.product_type" class="w-full" />
                         </div>
-                        <div class="field mb-0">
-                            <label class="text-500 font-medium text-sm">Product Barcode (UPC/EAN)</label>
+                        <div class="field mb-0 flex flex-column gap-2">
+                            <label class="font-bold">Product Barcode (UPC/EAN)</label>
                             <div class="p-inputgroup">
                                 <span class="p-inputgroup-addon"><i class="pi pi-barcode"></i></span>
                                 <InputText v-model="product.barcode" />
                             </div>
                         </div>
-                        <div class="field mb-0">
-                            <label class="text-500 font-medium text-sm">Carton Barcode (ITF-14)</label>
+                        <div class="field mb-0 flex flex-column gap-2">
+                            <label class="font-bold">Carton Barcode (ITF-14)</label>
                             <div class="p-inputgroup">
                                 <span class="p-inputgroup-addon"><i class="pi pi-box"></i></span>
                                 <InputText v-model="product.carton_barcode" />
@@ -476,17 +485,9 @@ const getIntegrationUrl = (link: any) => {
                 <div class="surface-card p-4 shadow-2 border-round">
                     <div class="text-xl font-bold mb-4">General Information</div>
                     <div class="grid formgrid p-fluid">
-                        <div class="field col-12">
+                        <div class="field col-12 flex flex-column gap-2">
                             <label class="font-bold">Description</label>
                             <Textarea v-model="product.description" rows="4" autoResize />
-                        </div>
-                        <div class="field col-12 md:col-6">
-                            <label class="font-bold">Supplier</label>
-                            <Select v-model="product.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" placeholder="Select Supplier" filter showClear />
-                        </div>
-                        <div class="field col-12 md:col-6">
-                            <label class="font-bold">Carton Quantity</label>
-                            <InputNumber v-model="product.carton_qty" showButtons :min="1" suffix=" units" />
                         </div>
                     </div>
                 </div>
@@ -495,15 +496,19 @@ const getIntegrationUrl = (link: any) => {
                 <div class="surface-card p-4 shadow-2 border-round">
                     <div class="text-xl font-bold mb-4">Pricing</div>
                     <div class="grid formgrid p-fluid">
-                        <div class="field col-12 md:col-4">
+                        <div class="field col-12 md:col-6 flex flex-column gap-2">
                             <label class="font-bold">Cost Price</label>
                             <InputNumber v-model="product.cost_price" mode="currency" currency="USD" locale="en-US" />
                         </div>
-                        <div class="field col-12 md:col-4">
+                        <div class="field col-12 md:col-6 flex flex-column gap-2">
+                            <label class="font-bold">List Price</label>
+                            <InputNumber v-model="product.retail_price" mode="currency" currency="USD" locale="en-US" />
+                        </div>
+                        <div class="field col-12 md:col-6 flex flex-column gap-2">
                             <label class="font-bold">Sale Price</label>
                             <InputNumber v-model="product.list_price" mode="currency" currency="USD" locale="en-US" />
                         </div>
-                        <div class="field col-12 md:col-4">
+                        <div class="field col-12 md:col-6 flex flex-column gap-2">
                             <label class="font-bold">Compare-at Price</label>
                             <InputNumber v-model="product.compare_at_price" mode="currency" currency="USD" locale="en-US" />
                         </div>
