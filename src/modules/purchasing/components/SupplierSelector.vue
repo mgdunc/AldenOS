@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
-import Select from 'primevue/select' // Change to Dropdown if on PrimeVue v3
+import Select from 'primevue/select'
 
 const props = defineProps<{
     modelValue: string | null | undefined,

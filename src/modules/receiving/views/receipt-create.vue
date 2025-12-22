@@ -11,7 +11,7 @@ import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputNumber from 'primevue/inputnumber'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
@@ -221,7 +221,9 @@ onMounted(fetchData)
                         </Column>
                         <Column field="location_id" header="Location" style="width: 12rem">
                             <template #body="{ data }">
-                                <Dropdown v-model="data.location_id" :options="locations" optionLabel="name" optionValue="id" class="w-full" />
+                                                            <div class="flex align-items-center gap-2">
+                                <Select v-model="data.location_id" :options="locations" optionLabel="name" optionValue="id" class="w-full" />
+                            </div>
                             </template>
                         </Column>
                     </DataTable>

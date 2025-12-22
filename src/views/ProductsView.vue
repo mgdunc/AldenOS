@@ -20,7 +20,7 @@ import InputIcon from 'primevue/inputicon'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import Toolbar from 'primevue/toolbar'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Badge from 'primevue/badge'
 
 const products = ref<any[]>([])
@@ -255,7 +255,7 @@ const getStatusSeverity = (status: string) => {
                 </template>
                 <template #end>
                     <div class="flex gap-2">
-                        <Dropdown v-model="filters.status.value" :options="statuses" optionLabel="label" optionValue="value" placeholder="Filter Status" class="w-12rem" @change="onStatusChange" />
+                        <Select v-model="filters.status.value" :options="statuses" optionLabel="label" optionValue="value" placeholder="Filter Status" class="w-12rem" @change="onStatusChange" />
                         <IconField iconPosition="left">
                             <InputIcon class="pi pi-search" />
                             <InputText v-model="filters['global'].value" placeholder="Search..." @keydown.enter="onSearch" />

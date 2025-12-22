@@ -17,7 +17,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Panel from 'primevue/panel'
 import InputNumber from 'primevue/inputnumber'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
 import ProgressBar from 'primevue/progressbar'
 import Dialog from 'primevue/dialog'
@@ -184,7 +184,7 @@ onMounted(fetchData)
                         <div class="flex-1">
                             <span class="text-500 text-sm font-medium block mb-2">Supplier</span>
                             <div v-if="isDraft" class="print:hidden">
-                                <Dropdown v-model="po.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" class="w-full" @change="updateSupplier" placeholder="Select Supplier" />
+                                <Select v-model="po.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" class="w-full" @change="updateSupplier" placeholder="Select Supplier" />
                             </div>
                             <div class="text-xl font-bold text-900 mt-2">{{ po.supplier_name || 'Unknown Supplier' }}</div>
                         </div>

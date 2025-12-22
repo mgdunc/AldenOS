@@ -7,7 +7,7 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 
 const props = defineProps<{
     integrationId: string
@@ -130,7 +130,7 @@ onMounted(() => {
     <Dialog v-model:visible="showAddDialog" header="Register Webhook" :modal="true" class="p-fluid" style="width: 450px">
       <div class="field">
         <label for="topic">Topic</label>
-        <Dropdown id="topic" v-model="newWebhook.topic" :options="webhookTopics" optionLabel="label" optionValue="value" />
+        <Select id="topic" v-model="newWebhook.topic" :options="webhookTopics" optionLabel="label" optionValue="value" />
       </div>
       <div class="field">
         <label for="address">Callback URL</label>

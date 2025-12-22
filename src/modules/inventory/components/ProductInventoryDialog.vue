@@ -77,7 +77,7 @@ watch(() => props.visible, (newVal) => {
     }
 })
 
-// Helper: List of locations for dropdown
+// Helper: List of locations for select
 const locationOptions = computed(() => {
   if (!props.product?.inventory_snapshots) return []
   // Unique locations from snapshots
