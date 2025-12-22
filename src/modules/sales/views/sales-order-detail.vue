@@ -689,7 +689,7 @@ onMounted(() => fetchOrderData())
                 </Column>
                 <Column field="unit_price" header="Price" style="min-width: 6rem">
                     <template #body="{ data }">
-                        <InputNumber v-if="order.status === 'draft'" v-model="data.unit_price" mode="currency" currency="USD" @blur="updateLineItem(data)" class="w-full" />
+                        <InputNumber v-if="order.status === 'draft'" v-model="data.unit_price" mode="currency" currency="GBP" locale="en-GB" @blur="updateLineItem(data)" class="w-full" />
                         <span v-else>{{ formatCurrency(data.unit_price) }}</span>
                     </template>
                 </Column>

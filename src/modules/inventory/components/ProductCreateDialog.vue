@@ -109,8 +109,8 @@ watch(() => props.visible, (newVal) => {
                         id="price_cost" 
                         v-model="form.price_cost" 
                         mode="currency" 
-                        currency="USD" 
-                        locale="en-US" 
+                        currency="GBP" 
+                        locale="en-GB" 
                         class="w-full"
                     />
                 </div>
@@ -120,8 +120,8 @@ watch(() => props.visible, (newVal) => {
                         id="list_price" 
                         v-model="form.list_price" 
                         mode="currency" 
-                        currency="USD" 
-                        locale="en-US" 
+                        currency="GBP" 
+                        locale="en-GB" 
                         class="w-full"
                     />
                 </div>

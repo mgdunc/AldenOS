@@ -298,7 +298,7 @@ onMounted(fetchData)
 
                 <Column header="Unit Cost" style="width: 10rem">
                     <template #body="{ data }">
-                        <InputNumber v-if="isDraft" v-model="data.unit_cost" mode="currency" currency="USD" locale="en-US" @blur="updateLine(data)" class="print:hidden w-full" />
+                        <InputNumber v-if="isDraft" v-model="data.unit_cost" mode="currency" currency="GBP" locale="en-GB" @blur="updateLine(data)" class="print:hidden w-full" />
                         <span v-else>{{ formatCurrency(data.unit_cost) }}</span>
                     </template>
                 </Column>
