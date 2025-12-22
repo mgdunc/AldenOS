@@ -46,11 +46,15 @@ import AttachmentGallery from '@/modules/core/components/AttachmentGallery.vue'
  * - Integrates with Inventory Demand to show required stock.
  */
 
+const props = defineProps<{
+    id?: string
+}>()
+
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
-const poId = route.params.id as string
+const poId = props.id || (route.params.id as string)
 
 // Use Composable
 const { 

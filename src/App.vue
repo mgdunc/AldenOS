@@ -28,7 +28,6 @@ const resetError = () => {
 }
 
 onMounted(() => {
-    authStore.initialize()
     // Safety timeout: If auth takes too long, stop loading so user can at least see the app (or login screen)
     setTimeout(() => {
         if (authStore.loading) {

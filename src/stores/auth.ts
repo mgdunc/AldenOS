@@ -11,51 +11,60 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
   const initialized = ref(false)
   const router = useRouter()
+  
+  // Promise to track initialization in progress
+  let initPromise: Promise<void> | null = null
 
   const isAuthenticated = computed(() => !!session.value)
   const isAdmin = computed(() => profile.value?.role === 'admin')
 
   async function initialize() {
     if (initialized.value) return
+    if (initPromise) return initPromise
     
     console.log('Auth: Initializing...')
     loading.value = true
     
-    try {
-      // Get initial session
-      console.log('Auth: Getting session...')
-      const { data, error } = await supabase.auth.getSession()
-      if (error) console.error('Auth: Session error', error)
-      
-      session.value = data.session
-      user.value = data.session?.user ?? null
-      console.log('Auth: Session retrieved', user.value?.id)
-
-      if (user.value) {
-        console.log('Auth: Fetching profile...')
-        await fetchProfile()
-        console.log('Auth: Profile fetched')
-      }
-
-      // Listen for changes
-      supabase.auth.onAuthStateChange(async (event, _session) => {
-        console.log('Auth: State change', event)
-        session.value = _session
-        user.value = _session?.user ?? null
+    initPromise = (async () => {
+      try {
+        // Get initial session
+        console.log('Auth: Getting session...')
+        const { data, error } = await supabase.auth.getSession()
+        if (error) console.error('Auth: Session error', error)
         
+        session.value = data.session
+        user.value = data.session?.user ?? null
+        console.log('Auth: Session retrieved', user.value?.id)
+
         if (user.value) {
+          console.log('Auth: Fetching profile...')
           await fetchProfile()
-        } else {
-          profile.value = null
+          console.log('Auth: Profile fetched')
         }
-      })
-    } catch (e) {
-      console.error('Auth: Initialization failed', e)
-    } finally {
-      console.log('Auth: Initialization complete')
-      loading.value = false
-      initialized.value = true
-    }
+
+        // Listen for changes
+        supabase.auth.onAuthStateChange(async (event, _session) => {
+          console.log('Auth: State change', event)
+          session.value = _session
+          user.value = _session?.user ?? null
+          
+          if (user.value) {
+            await fetchProfile()
+          } else {
+            profile.value = null
+          }
+        })
+      } catch (e) {
+        console.error('Auth: Initialization failed', e)
+      } finally {
+        console.log('Auth: Initialization complete')
+        loading.value = false
+        initialized.value = true
+        initPromise = null
+      }
+    })()
+
+    return initPromise
   }
 
   async function fetchProfile() {

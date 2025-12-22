@@ -15,6 +15,7 @@ const emit = defineEmits(['saved'])
 
 const toast = useToast()
 const loading = ref(false)
+const name = ref('')
 const shopUrl = ref('')
 const accessToken = ref('')
 const webhookSecret = ref('')
@@ -23,6 +24,7 @@ const isActive = ref(false)
 const loadSettings = async () => {
   if (!props.integrationId) {
       // Reset for new
+      name.value = ''
       shopUrl.value = ''
       accessToken.value = ''
       webhookSecret.value = ''
@@ -47,6 +49,7 @@ const loadSettings = async () => {
   if (data) {
     console.log('Settings loaded:', data)
     isActive.value = data.is_active
+    name.value = data.name || ''
     if (data.settings) {
       shopUrl.value = data.settings.shop_url || ''
       accessToken.value = data.settings.access_token || ''
@@ -77,6 +80,7 @@ const saveSettings = async () => {
       const res = await supabase
         .from('integrations')
         .update({
+            name: name.value,
             is_active: isActive.value,
             settings: settings,
             updated_at: new Date().toISOString()
@@ -93,6 +97,7 @@ const saveSettings = async () => {
         .from('integrations')
         .insert({
             provider: 'shopify',
+            name: name.value,
             is_active: isActive.value,
             settings: settings
         })
@@ -135,6 +140,10 @@ onMounted(() => {
 
     <form @submit.prevent="saveSettings">
       <div class="grid formgrid p-fluid">
+        <div class="field col-12">
+          <label for="name">Integration Name</label>
+          <InputText id="name" v-model="name" placeholder="My Shopify Store" />
+        </div>
         <div class="field col-12">
           <label for="shopUrl">Shop URL</label>
           <InputText id="shopUrl" v-model="shopUrl" placeholder="my-store.myshopify.com" />

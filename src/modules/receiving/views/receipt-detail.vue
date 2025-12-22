@@ -18,6 +18,8 @@ import Tag from 'primevue/tag'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Panel from 'primevue/panel'
+import Dialog from 'primevue/dialog'
+import PurchaseOrderDetailView from '@/modules/purchasing/views/purchase-order-detail.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +30,7 @@ const receiptId = route.params.id as string
 const receipt = ref<any>(null)
 const lines = ref<any[]>([])
 const loading = ref(true)
+const showPoDialog = ref(false)
 
 const fetchReceiptData = async () => {
     loading.value = true
@@ -64,6 +67,12 @@ const fetchReceiptData = async () => {
 }
 
 const goToPO = () => {
+    if (receipt.value?.purchase_orders?.id) {
+        showPoDialog.value = true
+    }
+}
+
+const navigateToPO = () => {
     if (receipt.value?.purchase_orders?.id) {
         router.push(`/purchases/${receipt.value.purchase_orders.id}`)
     }
@@ -123,7 +132,6 @@ onMounted(() => fetchReceiptData())
 
             <div class="flex gap-2">
                 <Button label="Back to List" icon="pi pi-arrow-left" text @click="router.push('/receipts')" />
-                <Button label="View Purchase Order" icon="pi pi-external-link" severity="secondary" @click="goToPO" />
                 <Button v-if="!receipt.notes?.includes('[REVERTED]')" label="Cancel Receipt" icon="pi pi-times" severity="danger" outlined @click="cancelReceipt" />
             </div>
         </div>
@@ -132,8 +140,11 @@ onMounted(() => fetchReceiptData())
             <div class="col-12 md:col-6">
                 <div class="surface-card p-3 border-round shadow-1 h-full">
                     <div class="text-500 font-medium text-sm mb-2">Vendor Details</div>
-                    <div class="font-bold text-xl">{{ receipt.purchase_orders?.suppliers?.name }}</div>
-                    <div class="text-600">PO: {{ receipt.purchase_orders?.po_number }}</div>
+                    <div class="font-bold text-xl">{{ receipt.purchase_orders?.suppliers?.name || receipt.purchase_orders?.supplier_name }}</div>
+                    <div class="text-600 flex align-items-center gap-2 mt-1">
+                        <span>PO: {{ receipt.purchase_orders?.po_number }}</span>
+                        <Button icon="pi pi-external-link" text rounded size="small" @click="goToPO" v-tooltip="'View Purchase Order'" />
+                    </div>
                 </div>
             </div>
         </div>
@@ -154,6 +165,16 @@ onMounted(() => fetchReceiptData())
                 </Column>
             </DataTable>
         </Panel>
+
+        <Dialog v-model:visible="showPoDialog" modal :style="{ width: '90vw' }" :dismissableMask="true">
+            <template #header>
+                <div class="flex align-items-center gap-2">
+                    <span class="font-bold text-xl">Purchase Order Details</span>
+                    <Button icon="pi pi-external-link" text rounded @click="navigateToPO" v-tooltip="'Open in full page'" />
+                </div>
+            </template>
+            <PurchaseOrderDetailView v-if="showPoDialog && receipt?.purchase_orders?.id" :id="receipt.purchase_orders.id" />
+        </Dialog>
 
     </div>
 </template>

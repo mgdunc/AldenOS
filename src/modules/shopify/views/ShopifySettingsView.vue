@@ -5,6 +5,7 @@ import ShopifyIntegrationCard from '../components/ShopifyIntegrationCard.vue'
 import ShopifyWebhooksCard from '../components/ShopifyWebhooksCard.vue'
 import ShopifyLogsCard from '../components/ShopifyLogsCard.vue'
 import ShopifyProductSyncCard from '../components/ShopifyProductSyncCard.vue'
+import ShopifyOrderSyncCard from '../components/ShopifyOrderSyncCard.vue'
 import ShopifyUnmatchedProducts from '../components/ShopifyUnmatchedProducts.vue'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
@@ -80,7 +81,7 @@ onMounted(() => {
             <Listbox 
                 v-model="selectedIntegration" 
                 :options="integrations" 
-                :optionLabel="(option: any) => option.settings?.shop_url || 'New Store'" 
+                :optionLabel="(option: any) => option.name || option.settings?.shop_url || 'New Store'" 
                 class="w-full border-none p-0"
                 listStyle="max-height: 200px"
             >
@@ -88,7 +89,7 @@ onMounted(() => {
                     <div class="flex align-items-center gap-2">
                         <i class="pi pi-shopping-bag text-xl"></i>
                         <div class="flex flex-column">
-                            <span class="font-bold">{{ option.settings?.shop_url || 'New Store' }}</span>
+                            <span class="font-bold">{{ option.name || option.settings?.shop_url || 'New Store' }}</span>
                             <span class="text-sm text-500">{{ option.is_active ? 'Active' : 'Inactive' }}</span>
                         </div>
                     </div>
@@ -112,21 +113,25 @@ onMounted(() => {
                 <Tabs value="0">
                 <TabList>
                     <Tab value="0">Product Sync</Tab>
-                    <Tab value="1">Unmatched Items</Tab>
-                    <Tab value="2">Webhooks</Tab>
-                    <Tab value="3">Logs</Tab>
+                    <Tab value="1">Order Sync</Tab>
+                    <Tab value="2">Unmatched Items</Tab>
+                    <Tab value="3">Webhooks</Tab>
+                    <Tab value="4">Logs</Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="0">
                     <ShopifyProductSyncCard :integration-id="selectedIntegration.id" />
                     </TabPanel>
                     <TabPanel value="1">
-                    <ShopifyUnmatchedProducts :integration-id="selectedIntegration.id" />
+                    <ShopifyOrderSyncCard :integration-id="selectedIntegration.id" />
                     </TabPanel>
                     <TabPanel value="2">
-                    <ShopifyWebhooksCard :integration-id="selectedIntegration.id" />
+                    <ShopifyUnmatchedProducts :integration-id="selectedIntegration.id" />
                     </TabPanel>
                     <TabPanel value="3">
+                    <ShopifyWebhooksCard :integration-id="selectedIntegration.id" />
+                    </TabPanel>
+                    <TabPanel value="4">
                     <ShopifyLogsCard :integration-id="selectedIntegration.id" />
                     </TabPanel>
                 </TabPanels>
