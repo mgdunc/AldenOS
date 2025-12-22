@@ -10,12 +10,14 @@ import Button from 'primevue/button'
 import Avatar from 'primevue/avatar'
 import Drawer from 'primevue/drawer' // For mobile sidebar
 import ErrorView from '@/modules/core/views/ErrorView.vue'
+import GlobalSearch from '@/components/GlobalSearch.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const mobileMenuVisible = ref(false)
 const globalError = ref<any>(null)
+const searchVisible = ref(false)
 
 onErrorCaptured((err) => {
     console.error('Global Error Captured:', err)
@@ -64,6 +66,7 @@ const items = ref([
         label: 'Sales',
         items: [
             { label: 'Sales Orders', icon: 'pi pi-shopping-cart', route: '/sales' },
+            { label: 'Customers', icon: 'pi pi-users', route: '/customers' },
             { label: 'Fulfillments', icon: 'pi pi-truck', route: '/fulfillments' },
         ]
     },
@@ -94,6 +97,7 @@ const items = ref([
 <template>
     <Toast position="top-right" :life="3000" />
     <ConfirmDialog />
+    <GlobalSearch v-model:visible="searchVisible" />
     <SpeedInsights />
     
     <div v-if="authStore.loading" class="flex align-items-center justify-content-center h-screen w-screen surface-ground">
@@ -155,8 +159,8 @@ const items = ref([
                     <Button icon="pi pi-bars" text class="md:hidden" @click="mobileMenuVisible = true" />
                     <span class="text-lg font-medium text-700">Warehouse Management</span>
                 </div>
-
                 <div class="flex gap-2">
+                     <Button icon="pi pi-search" label="Search" text @click="searchVisible = true" />
                      <Button icon="pi pi-bell" text rounded severity="secondary" />
                      <Button icon="pi pi-cog" text rounded severity="secondary" />
                 </div>

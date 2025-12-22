@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'vue-router'
-import { useToast } from 'primevue/usetoast'
-import { FilterMatchMode } from '@primevue/core/api'
+import { usePurchaseOrders } from '../composables/usePurchaseOrders'
+import { usePurchasingStore } from '../store'
 
 // Import Helpers
 import { formatDate } from '@/lib/formatDate'
@@ -20,67 +19,55 @@ import ProgressBar from 'primevue/progressbar'
 import Badge from 'primevue/badge'
 
 const router = useRouter()
-const toast = useToast()
+const store = usePurchasingStore()
+const { loading, saving, loadPurchaseOrders, createPurchaseOrder } = usePurchaseOrders()
 
-const orders = ref<any[]>([])
-const loading = ref(true)
-const creatingOrder = ref(false)
 const expandedRows = ref([])
 const activeTab = ref('all')
-
-const filters = ref({
-    global: { value: null, matchMode: FilterMatchMode.CONTAINS }
-})
+const searchTerm = ref('')
 
 // KPI Counters
 const kpis = computed(() => {
     return {
-        draft: orders.value.filter(o => o.status === 'draft').length,
-        placed: orders.value.filter(o => o.status === 'placed').length,
-        partial: orders.value.filter(o => o.status === 'partial_received').length,
-        all: orders.value.length
+        draft: store.purchaseOrders.filter(o => o.status === 'draft').length,
+        placed: store.purchaseOrders.filter(o => o.status === 'confirmed').length,
+        partial: store.purchaseOrders.filter(o => o.status === 'partial').length,
+        all: store.purchaseOrders.length
     }
 })
 
 // Tab Filtering Logic
 const filteredOrders = computed(() => {
-    if (activeTab.value === 'all') return orders.value
-    if (activeTab.value === 'active') {
-        return orders.value.filter(o => !['received', 'cancelled'].includes(o.status))
+    let result = store.purchaseOrders
+
+    // Apply search filter
+    if (searchTerm.value) {
+        const search = searchTerm.value.toLowerCase()
+        result = result.filter(o => 
+            o.po_number?.toLowerCase().includes(search) ||
+            o.supplier?.name?.toLowerCase().includes(search)
+        )
     }
-    if (activeTab.value === 'draft') return orders.value.filter(o => o.status === 'draft')
-    if (activeTab.value === 'placed') return orders.value.filter(o => o.status === 'placed' || o.status === 'partial_received')
-    if (activeTab.value === 'received') return orders.value.filter(o => o.status === 'received')
-    return orders.value
+
+    // Apply tab filter
+    if (activeTab.value === 'all') return result
+    if (activeTab.value === 'active') {
+        return result.filter(o => !['received', 'cancelled'].includes(o.status))
+    }
+    if (activeTab.value === 'draft') return result.filter(o => o.status === 'draft')
+    if (activeTab.value === 'placed') return result.filter(o => o.status === 'confirmed' || o.status === 'partial')
+    if (activeTab.value === 'received') return result.filter(o => o.status === 'received')
+    return result
 })
 
-const fetchOrders = async () => {
-    loading.value = true
-    // Fetch POs + Line Items for the preview/progress calculation
-    const { data, error } = await supabase
-        .from('purchase_orders')
-        .select(`
-            *,
-            purchase_order_lines (
-                id,
-                quantity_ordered,
-                quantity_received,
-                products (sku, name)
-            )
-        `)
-        .order('created_at', { ascending: false })
-    
-    if (error) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to fetch orders' })
-    } else {
-        orders.value = (data || []).map(po => ({
-            ...po,
-            item_count: po.purchase_order_lines.length,
-            receipt_pct: calculateReceiptProgress(po.purchase_order_lines)
-        }))
-    }
-    loading.value = false
-}
+// Add line items and receipt % to POs
+const posWithDetails = computed(() => {
+    return filteredOrders.value.map((po: any) => ({
+        ...po,
+        item_count: po.lines?.length || 0,
+        receipt_pct: calculateReceiptProgress(po.lines || [])
+    }))
+})
 
 const calculateReceiptProgress = (lines: any[]) => {
     if (!lines || lines.length === 0) return 0
@@ -90,19 +77,18 @@ const calculateReceiptProgress = (lines: any[]) => {
     return Math.round((totalReceived / totalOrdered) * 100)
 }
 
-const createDraftOrder = async () => {
-    creatingOrder.value = true
-    const { data, error } = await supabase
-        .from('purchase_orders')
-        .insert({ supplier_name: 'New Supplier', status: 'draft' })
-        .select().single()
+const fetchOrders = async () => {
+    await loadPurchaseOrders()
+}
 
-    creatingOrder.value = false
-    if (error) {
-        toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-    } else {
-        toast.add({ severity: 'success', summary: 'Created', detail: 'Draft PO created.' })
-        router.push(`/purchases/${data.id}`)
+const createDraftOrder = async () => {
+    const po = await createPurchaseOrder(
+        { status: 'draft', order_date: new Date().toISOString().split('T')[0] },
+        []
+    )
+    
+    if (po) {
+        router.push(`/purchases/${po.id}`)
     }
 }
 
@@ -173,21 +159,20 @@ onMounted(fetchOrders)
                 <div class="flex gap-2">
                     <span class="p-input-icon-left">
                         <i class="pi pi-search" />
-                        <InputText v-model="filters['global'].value" placeholder="Search POs..." class="p-inputtext-sm" />
+                        <InputText v-model="searchTerm" placeholder="Search POs..." class="p-inputtext-sm" />
                     </span>
                     <Button icon="pi pi-refresh" outlined rounded @click="fetchOrders" :loading="loading" />
-                    <Button label="New PO" icon="pi pi-plus" @click="createDraftOrder" :loading="creatingOrder" />
+                    <Button label="New PO" icon="pi pi-plus" @click="createDraftOrder" :loading="saving" />
                 </div>
             </div>
 
             <DataTable 
                 v-model:expandedRows="expandedRows"
-                :value="filteredOrders" 
+                :value="posWithDetails" 
                 stripedRows 
                 :loading="loading" 
                 paginator 
-                :rows="10" 
-                :filters="filters"
+                :rows="10"
                 selectionMode="single" 
                 dataKey="id"
                 @rowSelect="(e: any) => router.push(`/purchases/${e.data.id}`)"
@@ -237,7 +222,7 @@ onMounted(fetchOrders)
                 <template #expansion="{ data }">
                     <div class="p-3 surface-50 border-bottom-1 surface-border">
                         <span class="font-bold block mb-2 text-sm text-500">PO Contents</span>
-                        <DataTable :value="data.purchase_order_lines" size="small" class="p-datatable-sm">
+                        <DataTable :value="data.lines" size="small" class="p-datatable-sm">
                             <Column field="products.sku" header="SKU" />
                             <Column field="products.name" header="Product" />
                             <Column field="quantity_ordered" header="Ordered" />

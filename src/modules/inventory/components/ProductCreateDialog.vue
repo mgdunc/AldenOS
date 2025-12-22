@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { supabase } from '@/lib/supabase'
-import { useToast } from 'primevue/usetoast'
+import { useInventory } from '../composables/useInventory'
+import type { Product } from '../types'
 
 // Components
 import Dialog from 'primevue/dialog'
@@ -15,15 +15,14 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits(['update:visible', 'created'])
-const toast = useToast()
+const { saving, createProduct } = useInventory()
 
-const loading = ref(false)
 const form = ref({
     sku: '',
     name: '',
     description: '',
     list_price: 0,
-    price_cost: 0
+    cost: 0
 })
 
 const resetForm = () => {
@@ -32,38 +31,19 @@ const resetForm = () => {
         name: '',
         description: '',
         list_price: 0,
-        price_cost: 0
+        cost: 0
     }
 }
 
 const handleSave = async () => {
     if (!form.value.sku || !form.value.name) {
-        toast.add({ severity: 'warn', summary: 'Validation Error', detail: 'SKU and Name are required.' })
         return
     }
 
-    loading.value = true
+    const product = await createProduct(form.value as Partial<Product>)
     
-    const { data, error } = await supabase
-        .from('products')
-        .insert({
-            sku: form.value.sku,
-            name: form.value.name,
-            description: form.value.description,
-            list_price: form.value.list_price,
-            price_cost: form.value.price_cost
-        })
-        .select()
-        .single()
-
-    loading.value = false
-
-    if (error) {
-        console.error(error)
-        toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-    } else {
-        toast.add({ severity: 'success', summary: 'Success', detail: 'Product created successfully' })
-        emit('created', data)
+    if (product) {
+        emit('created', product)
         emit('update:visible', false)
         resetForm()
     }
@@ -71,8 +51,7 @@ const handleSave = async () => {
 
 watch(() => props.visible, (newVal) => {
     if (!newVal) {
-        // Optional: reset form on close? 
-        // resetForm() 
+        // Optional: reset form on close
     }
 })
 </script>
@@ -104,10 +83,10 @@ watch(() => props.visible, (newVal) => {
 
             <div class="formgrid grid">
                 <div class="field col">
-                    <label for="price_cost" class="font-bold">Cost Price</label>
+                    <label for="cost" class="font-bold">Cost Price</label>
                     <InputNumber 
-                        id="price_cost" 
-                        v-model="form.price_cost" 
+                        id="cost" 
+                        v-model="form.cost" 
                         mode="currency" 
                         currency="GBP" 
                         locale="en-GB" 
@@ -133,7 +112,7 @@ watch(() => props.visible, (newVal) => {
                 <small class="text-xs text-300">ProductCreateDialog.vue</small>
                 <div class="flex gap-2">
                     <Button label="Cancel" text @click="emit('update:visible', false)" />
-                    <Button label="Create Product" icon="pi pi-check" @click="handleSave" :loading="loading" />
+                    <Button label="Create Product" icon="pi pi-check" @click="handleSave" :loading="saving" />
                 </div>
             </div>
         </template>

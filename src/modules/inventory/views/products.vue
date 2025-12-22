@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { formatCurrency } from '@/lib/formatCurrency'
 import { supabase } from '@/lib/supabase'
-import { FilterMatchMode } from '@primevue/core/api'
+import { useInventoryStore } from '../store'
+import type { ProductFilters } from '../types'
 
 // Centralized Dialog Components
 import ProductInventoryDialog from '@/modules/inventory/components/ProductInventoryDialog.vue' 
@@ -21,19 +22,13 @@ import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import Toolbar from 'primevue/toolbar'
 import Select from 'primevue/select'
-import Badge from 'primevue/badge'
-import Dialog from 'primevue/dialog'
 
-const products = ref<any[]>([])
-const loading = ref(false)
+const store = useInventoryStore()
+
 const totalRecords = ref(0)
-const stats = ref<any>({
-    total_products: 0,
-    active_products: 0,
-    low_stock: 0,
-    out_of_stock: 0,
-    total_valuation: 0
-})
+const localSearch = ref('')
+const localStatus = ref<string | null>('active')
+const productsWithShopify = ref<any[]>([])
 
 const lazyParams = ref({ 
     first: 0, 
@@ -51,11 +46,6 @@ const statuses = ref([
     { label: 'Archived', value: 'archived' }
 ])
 
-const filters = ref({
-    global: { value: null, matchMode: FilterMatchMode.CONTAINS },
-    status: { value: 'active', matchMode: FilterMatchMode.EQUALS }
-})
-
 // Dialog Visibility States
 const showBreakdown = ref(false)
 const showReservedDialog = ref(false)
@@ -66,6 +56,15 @@ const showCreateDialog = ref(false)
 const selectedProduct = ref<any>(null)
 const dt = ref()
 
+// Stats from RPC (kept for now since it uses product_inventory_view)
+const statsRpc = ref<any>({
+    total_products: 0,
+    active_products: 0,
+    low_stock: 0,
+    out_of_stock: 0,
+    total_valuation: 0
+})
+
 const onProductCreated = () => {
     fetchProducts()
     fetchStats()
@@ -73,24 +72,22 @@ const onProductCreated = () => {
 
 const fetchStats = async () => {
     const { data } = await supabase.rpc('get_product_stats')
-    if (data) stats.value = data
+    if (data) statsRpc.value = data
 }
 
 const fetchProducts = async () => {
-    loading.value = true
     const { first, rows, sortField, sortOrder } = lazyParams.value
 
     let query = supabase
         .from('product_inventory_view')
         .select('*', { count: 'exact' })
         
-    if (filters.value.global.value) {
-        const searchTerm = filters.value.global.value
-        query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`)
+    if (localSearch.value) {
+        query = query.or(`name.ilike.%${localSearch.value}%,sku.ilike.%${localSearch.value}%`)
     }
 
-    if (filters.value.status.value) {
-        query = query.eq('status', filters.value.status.value)
+    if (localStatus.value) {
+        query = query.eq('status', localStatus.value)
     }
 
     if (sortField) {
@@ -126,15 +123,14 @@ const fetchProducts = async () => {
             legacyData?.forEach(p => linkedSet.add(p.id))
             integrationData?.forEach(p => linkedSet.add(p.product_id))
 
-            products.value = data.map(p => ({
+            productsWithShopify.value = data.map(p => ({
                 ...p,
                 is_shopify_linked: linkedSet.has(p.product_id)
             }))
         } else {
-            products.value = []
+            productsWithShopify.value = []
         }
     }
-    loading.value = false
 }
 
 const openReserved = (prod: any) => {
@@ -216,13 +212,13 @@ const getStatusSeverity = (status: string) => {
                     <div class="flex justify-content-between mb-3">
                         <div>
                             <span class="block text-500 font-medium mb-3">Total Products</span>
-                            <div class="text-900 font-medium text-xl">{{ stats.total_products }}</div>
+                            <div class="text-900 font-medium text-xl">{{ statsRpc.total_products }}</div>
                         </div>
                         <div class="flex align-items-center justify-content-center bg-blue-100 border-round" style="width:2.5rem;height:2.5rem">
                             <i class="pi pi-box text-blue-500 text-xl"></i>
                         </div>
                     </div>
-                    <span class="text-green-500 font-medium">{{ stats.active_products }} </span>
+                    <span class="text-green-500 font-medium">{{ statsRpc.active_products }} </span>
                     <span class="text-500">active</span>
                 </div>
             </div>
@@ -231,7 +227,7 @@ const getStatusSeverity = (status: string) => {
                     <div class="flex justify-content-between mb-3">
                         <div>
                             <span class="block text-500 font-medium mb-3">Low Stock</span>
-                            <div class="text-900 font-medium text-xl">{{ stats.low_stock }}</div>
+                            <div class="text-900 font-medium text-xl">{{ statsRpc.low_stock }}</div>
                         </div>
                         <div class="flex align-items-center justify-content-center bg-orange-100 border-round" style="width:2.5rem;height:2.5rem">
                             <i class="pi pi-exclamation-triangle text-orange-500 text-xl"></i>
@@ -245,7 +241,7 @@ const getStatusSeverity = (status: string) => {
                     <div class="flex justify-content-between mb-3">
                         <div>
                             <span class="block text-500 font-medium mb-3">Out of Stock</span>
-                            <div class="text-900 font-medium text-xl">{{ stats.out_of_stock }}</div>
+                            <div class="text-900 font-medium text-xl">{{ statsRpc.out_of_stock }}</div>
                         </div>
                         <div class="flex align-items-center justify-content-center bg-red-100 border-round" style="width:2.5rem;height:2.5rem">
                             <i class="pi pi-times-circle text-red-500 text-xl"></i>
@@ -259,7 +255,7 @@ const getStatusSeverity = (status: string) => {
                     <div class="flex justify-content-between mb-3">
                         <div>
                             <span class="block text-500 font-medium mb-3">Inventory Value</span>
-                            <div class="text-900 font-medium text-xl">{{ formatCurrency(stats.total_valuation) }}</div>
+                            <div class="text-900 font-medium text-xl">{{ formatCurrency(statsRpc.total_valuation) }}</div>
                         </div>
                         <div class="flex align-items-center justify-content-center bg-green-100 border-round" style="width:2.5rem;height:2.5rem">
                             <i class="pi pi-dollar text-green-500 text-xl"></i>
@@ -279,10 +275,10 @@ const getStatusSeverity = (status: string) => {
                 </template>
                 <template #end>
                     <div class="flex gap-2">
-                        <Select v-model="filters.status.value" :options="statuses" optionLabel="label" optionValue="value" placeholder="Filter Status" class="w-12rem" @change="onStatusChange" />
+                        <Select v-model="localStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Filter Status" class="w-12rem" @change="onStatusChange" />
                         <IconField iconPosition="left">
                             <InputIcon class="pi pi-search" />
-                            <InputText v-model="filters['global'].value" placeholder="Search..." @keydown.enter="onSearch" />
+                            <InputText v-model="localSearch" placeholder="Search..." @keydown.enter="onSearch" />
                         </IconField>
                     </div>
                 </template>
@@ -290,8 +286,8 @@ const getStatusSeverity = (status: string) => {
 
             <DataTable 
                 ref="dt"
-                :value="products" 
-                :loading="loading" 
+                :value="productsWithShopify" 
+                :loading="store.loading" 
                 lazy 
                 paginator 
                 :rows="50" 
