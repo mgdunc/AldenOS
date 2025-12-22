@@ -9,6 +9,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import { formatDate } from '@/lib/formatDate'
 
 // --- Components ---
@@ -21,6 +22,7 @@ import Panel from 'primevue/panel'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 
 const receiptId = route.params.id as string
 const receipt = ref<any>(null)
@@ -67,6 +69,35 @@ const goToPO = () => {
     }
 }
 
+const cancelReceipt = () => {
+    confirm.require({
+        message: 'Are you sure you want to cancel this receipt? This will reverse inventory adjustments and update the PO status.',
+        header: 'Cancel Receipt',
+        icon: 'pi pi-exclamation-triangle',
+        rejectProps: {
+            label: 'Cancel',
+            severity: 'secondary',
+            outlined: true
+        },
+        acceptProps: {
+            label: 'Confirm Cancellation',
+            severity: 'danger'
+        },
+        accept: async () => {
+            loading.value = true
+            const { error } = await supabase.rpc('revert_inventory_receipt', { p_receipt_id: receiptId })
+            
+            if (error) {
+                toast.add({ severity: 'error', summary: 'Error', detail: error.message })
+                loading.value = false
+            } else {
+                toast.add({ severity: 'success', summary: 'Success', detail: 'Receipt cancelled successfully' })
+                router.push('/receipts')
+            }
+        }
+    })
+}
+
 onMounted(() => fetchReceiptData())
 </script>
 
@@ -82,7 +113,7 @@ onMounted(() => fetchReceiptData())
                 <div class="text-500 text-sm mb-1">Receipt Record</div>
                 <div class="flex align-items-center gap-3">
                     <h1 class="text-3xl font-bold m-0">{{ receipt.receipt_number }}</h1>
-                    <Tag value="COMPLETED" severity="success" />
+                    <Tag :value="receipt.notes?.includes('[REVERTED]') ? 'CANCELLED' : 'COMPLETED'" :severity="receipt.notes?.includes('[REVERTED]') ? 'danger' : 'success'" />
                 </div>
                 <div class="mt-2 text-sm text-600">
                     Received on {{ formatDate(receipt.received_at) }} 
@@ -93,6 +124,7 @@ onMounted(() => fetchReceiptData())
             <div class="flex gap-2">
                 <Button label="Back to List" icon="pi pi-arrow-left" text @click="router.push('/receipts')" />
                 <Button label="View Purchase Order" icon="pi pi-external-link" severity="secondary" @click="goToPO" />
+                <Button v-if="!receipt.notes?.includes('[REVERTED]')" label="Cancel Receipt" icon="pi pi-times" severity="danger" outlined @click="cancelReceipt" />
             </div>
         </div>
 
