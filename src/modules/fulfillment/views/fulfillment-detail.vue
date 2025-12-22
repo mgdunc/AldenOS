@@ -44,7 +44,7 @@ const loadData = async () => {
     // 2. Fetch Lines (Linked to Products)
     const { data: items, error: lineErr } = await supabase
         .from('fulfillment_lines')
-        .select('*, sales_order_lines(products(sku, name))')
+        .select('*, sales_order_lines(products(sku, name)), locations(name)')
         .eq('fulfillment_id', id)
 
     if (headErr || lineErr) {
@@ -246,6 +246,11 @@ onMounted(() => {
             <DataTable :value="lines" stripedRows>
                 <Column field="sales_order_lines.products.sku" header="SKU" style="width: 10rem" class="font-bold"/>
                 <Column field="sales_order_lines.products.name" header="Product" />
+                <Column field="locations.name" header="Location" style="width: 10rem">
+                    <template #body="{ data }">
+                        <Tag :value="data.locations?.name || 'Unassigned'" severity="info" icon="pi pi-map-marker" />
+                    </template>
+                </Column>
                 <Column field="quantity" header="Qty" style="width: 6rem" class="text-center text-lg font-bold" />
                 <Column header="Check" style="width: 4rem" v-if="fulfillment.status !== 'shipped'">
                     <template #body>

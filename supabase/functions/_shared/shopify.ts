@@ -56,6 +56,35 @@ export class ShopifyClient {
     return data.count;
   }
 
+  async getProductsPage(limit = 50, pageInfo?: string): Promise<{ products: any[], nextPageInfo: string | null }> {
+    let url = `products.json?limit=${limit}`;
+    if (pageInfo) {
+        url = `products.json?limit=${limit}&page_info=${pageInfo}`;
+    }
+    
+    const res = await this.fetch(url);
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Failed to fetch products: ${res.status} ${text}`);
+    }
+    
+    const data = await res.json();
+    
+    let nextPageInfo = null;
+    const linkHeader = res.headers.get('Link');
+    if (linkHeader) {
+        // Extract page_info from the "next" link
+        // Link: <https://.../products.json?limit=50&page_info=eyJ...>; rel="next"
+        const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        if (match) {
+            const nextUrl = new URL(match[1]);
+            nextPageInfo = nextUrl.searchParams.get('page_info');
+        }
+    }
+
+    return { products: data.products, nextPageInfo };
+  }
+
   async *getProducts(limit = 50) {
     let url = `products.json?limit=${limit}`;
     
