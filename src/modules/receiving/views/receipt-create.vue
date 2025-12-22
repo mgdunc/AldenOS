@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import { formatDate } from '@/lib/formatDate'
 
 // PrimeVue
@@ -18,6 +19,7 @@ import Textarea from 'primevue/textarea'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 
 const poId = route.query.po_id as string
 const po = ref<any>(null)
@@ -85,8 +87,17 @@ const processReceipt = async () => {
         return
     }
 
-    if (!confirm(`Receive ${itemsToReceive.length} items? This will update inventory.`)) return
+    confirm.require({
+        message: `Receive ${itemsToReceive.length} items? This will update inventory.`,
+        header: 'Confirm Receipt',
+        icon: 'pi pi-exclamation-triangle',
+        accept: async () => {
+            await executeReceipt(itemsToReceive)
+        }
+    })
+}
 
+const executeReceipt = async (itemsToReceive: any[]) => {
     processing.value = true
 
     try {
