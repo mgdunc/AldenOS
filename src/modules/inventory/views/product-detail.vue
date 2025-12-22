@@ -433,10 +433,10 @@ const getIntegrationUrl = (link: any) => {
                         
                         <div class="flex gap-2 w-full">
                             <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelect" />
-                            <Button label="Upload Image" icon="pi pi-upload" class="w-full" outlined @click="triggerFileUpload" :loading="uploadingImage" />
-                            <Button v-if="product.image_url" icon="pi pi-trash" severity="danger" outlined @click="product.image_url = null" />
+                            <Button v-if="!product.image_url" label="Upload Image" icon="pi pi-upload" class="w-full" outlined @click="triggerFileUpload" :loading="uploadingImage" />
+                            <Button v-else label="Remove Image" icon="pi pi-trash" severity="danger" outlined class="w-full" @click="product.image_url = null" />
                         </div>
-                        <InputText v-model="product.image_url" placeholder="Or enter URL..." class="w-full text-sm" />
+                        <InputText v-if="!product.image_url" v-model="product.image_url" placeholder="Or enter URL..." class="w-full text-sm" />
                     </div>
                 </div>
 
