@@ -56,7 +56,7 @@ const openNewReceiptDialog = async () => {
     const { data } = await supabase
         .from('purchase_orders')
         .select('*')
-        .in('status', ['placed', 'partial_received'])
+        .in('status', ['placed', 'partial', 'partial_received'])
         .order('expected_date', { ascending: true })
     
     receivablePOs.value = data || []
