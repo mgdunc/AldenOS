@@ -69,15 +69,15 @@ onMounted(() => {
     <div class="flex align-items-center justify-content-between mb-4">
       <div>
         <h2 class="text-2xl font-bold m-0">Shopify Integration</h2>
-        <p class="text-gray-600 mt-1">Manage multiple Shopify stores.</p>
+        <p class="text-gray-600 mt-1">Sync products, orders, and inventory with your Shopify stores.</p>
       </div>
-      <Button label="Add Store" icon="pi pi-plus" @click="createNew" />
+      <Button label="Add Store" icon="pi pi-plus" severity="success" @click="createNew" />
     </div>
     
-    <div class="flex flex-column gap-4">
+    <div class="flex flex-column lg:flex-row gap-4">
       <!-- Store List -->
-      <div class="surface-card shadow-2 border-round p-3">
-            <h3 class="text-lg font-bold mb-3">Connected Stores</h3>
+      <div class="surface-card shadow-2 border-round p-4 lg:w-3 w-full">
+            <h3 class="text-lg font-bold mb-3"><i class="pi pi-shopping-bag mr-2"></i>Connected Stores</h3>
             <Listbox 
                 v-model="selectedIntegration" 
                 :options="integrations" 
@@ -101,7 +101,7 @@ onMounted(() => {
       </div>
 
       <!-- Details -->
-      <div v-if="selectedIntegration" class="flex flex-column gap-4">
+      <div v-if="selectedIntegration" class="flex flex-column gap-4 lg:w-9 w-full">
             <div class="w-full">
                 <ShopifyIntegrationCard 
                     :key="selectedIntegration.id"

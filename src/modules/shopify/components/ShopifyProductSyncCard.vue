@@ -189,44 +189,49 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="card">
+  <div class="surface-card shadow-2 border-round p-4">
     <div class="flex align-items-center justify-content-between mb-4">
-      <h3 class="text-xl font-semibold m-0">Product Synchronization</h3>
+      <div>
+        <h3 class="text-xl font-semibold m-0 mb-2"><i class="pi pi-sync mr-2"></i>Product Synchronization</h3>
+        <p class="text-sm text-600 m-0">Fetch and match products from Shopify by SKU</p>
+      </div>
       <div class="flex gap-2">
           <Button 
             v-if="syncing" 
-            label="Stop Sync" 
+            label="Stop" 
             icon="pi pi-stop-circle" 
             severity="danger" 
+            outlined
+            size="small"
             @click="stopSync" 
           />
           <Button 
-            :label="syncing ? 'Syncing...' : 'Start Sync'" 
+            :label="syncing ? 'Syncing' : 'Start Sync'" 
             :icon="syncing ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" 
             @click="syncProducts" 
-            :disabled="syncing" 
+            :disabled="syncing"
+            severity="primary"
+            size="small"
           />
       </div>
     </div>
 
-    <div v-if="syncing && currentJob" class="mb-4">
-        <div class="flex justify-content-between mb-2">
-            <span>Progress: {{ currentJob.processed_items }} / {{ currentJob.total_items || '?' }}</span>
-            <span v-if="estimatedTimeRemaining">Est. Remaining: {{ estimatedTimeRemaining }}</span>
+    <div v-if="syncing && currentJob" class="surface-100 p-3 border-round mb-4">
+        <div class="flex justify-content-between mb-2 text-sm">
+            <span class="font-semibold">Progress: {{ currentJob.processed_items }} / {{ currentJob.total_items || '?' }}</span>
+            <Tag v-if="estimatedTimeRemaining" :value="'~' + estimatedTimeRemaining" severity="info" size="small" />
         </div>
-        <ProgressBar :value="progressPercentage" :showValue="false" style="height: 10px"></ProgressBar>
+        <ProgressBar :value="progressPercentage" style="height: 12px"></ProgressBar>
     </div>
 
-    <p class="text-gray-600 mb-4">
-      Manually trigger a sync to fetch the latest products from Shopify. 
-      This will match products by SKU and link them.
-    </p>
-
-    <div v-if="liveLogs.length > 0" class="surface-ground p-3 border-round mb-4 font-mono text-sm" style="max-height: 200px; overflow-y: auto;" id="log-container">
-      <div v-for="(log, index) in liveLogs" :key="index" class="mb-1">{{ log }}</div>
+    <div v-if="liveLogs.length > 0" class="surface-50 border-1 surface-border p-3 border-round mb-4 font-mono text-xs" style="max-height: 250px; overflow-y: auto; background-color: #1e1e1e; color: #d4d4d4;" id="log-container">
+      <div v-for="(log, index) in liveLogs" :key="index" class="mb-1" style="white-space: pre-wrap; word-break: break-word;">{{ log }}</div>
     </div>
 
-    <h4 class="mb-2">Sync History</h4>
+    <div class="flex align-items-center gap-2 mb-3">
+      <i class="pi pi-history text-xl"></i>
+      <h4 class="m-0">Sync History</h4>
+    </div>
     <DataTable :value="history" :loading="loadingHistory" size="small" stripedRows>
       <Column field="created_at" header="Date">
         <template #body="slotProps">

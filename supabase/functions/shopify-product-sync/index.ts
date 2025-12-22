@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// Force deploy update: 2025-12-22b
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { ShopifyClient } from "../_shared/shopify.ts"
@@ -27,6 +28,8 @@ serve(async (req) => {
     jobId = body.jobId
     integrationId = body.integrationId
     page_info = body.page_info
+    
+    console.log(`[SYNC] Received request - jobId: ${jobId}, page_info: ${page_info ? 'present' : 'none'}`)
   } catch (e) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), { 
       status: 400,
@@ -67,8 +70,10 @@ serve(async (req) => {
       if (jobId && !page_info) {
         await supabase.from('integration_sync_jobs').update({
           status: 'running',
+          started_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }).eq('id', jobId)
+        console.log(`[SYNC] Job ${jobId} marked as running`)
       }
 
       if (sync_id && !page_info) await log("Starting product sync...", "info")
@@ -116,8 +121,12 @@ serve(async (req) => {
       }
 
       // Fetch ONE page
-      const { products, nextPageInfo } = await shopify.getProductsPage(250, page_info)
+      console.log(`[SYNC] Fetching page with limit 50, page_info: ${page_info || 'none'}`)
+      const { products, nextPageInfo } = await shopify.getProductsPage(50, page_info)
       
+      console.log(`[SYNC] Fetched ${products.length} products, nextPageInfo: ${nextPageInfo ? 'present' : 'none'}`)
+      await log(`Fetched batch of ${products.length} products from Shopify.`, "info")
+
       if (products.length > 0) {
         // Process Batch
         const unmatchedBatch: any[] = []
@@ -170,6 +179,15 @@ serve(async (req) => {
               })
 
               updatedCount++
+              
+              // Remove from unmatched if it was there previously
+              // This is a "soft delete" - we'll delete any existing unmatched record for this variant
+              await supabase
+                .from('integration_unmatched_products')
+                .delete()
+                .eq('integration_id', integration.id)
+                .eq('external_variant_id', variant.id.toString())
+                
             } else {
                 // Add to unmatched batch
                 unmatchedBatch.push({
@@ -196,36 +214,47 @@ serve(async (req) => {
 
         // 4. Execute Bulk Operations
         if (integrationUpserts.length > 0) {
+            console.log(`[SYNC] Upserting ${integrationUpserts.length} product integration links`)
             const { error: linkError } = await supabase
                 .from('product_integrations')
                 .upsert(integrationUpserts, { onConflict: 'product_id, integration_id' })
             
-            if (linkError) console.error('Error linking products:', linkError)
+            if (linkError) {
+                console.error('[SYNC] Error linking products:', linkError)
+                await log(`Error linking products: ${linkError.message}`, "error")
+            } else {
+                await log(`Linked ${integrationUpserts.length} products`, "info")
+            }
         }
 
         if (unmatchedBatch.length > 0) {
+            console.log(`[SYNC] Upserting ${unmatchedBatch.length} unmatched products`)
             const { error: unmatchedError } = await supabase
                 .from('integration_unmatched_products')
                 .upsert(unmatchedBatch, { onConflict: 'integration_id, external_variant_id' })
             
             if (unmatchedError) {
-                console.error('Error inserting unmatched products:', unmatchedError)
+                console.error('[SYNC] Error inserting unmatched products:', unmatchedError)
+                await log(`Error recording unmatched products: ${unmatchedError.message}`, "error")
+            } else {
+                await log(`Recorded ${unmatchedBatch.length} unmatched products`, "info")
             }
         }
 
         if (productUpdates.length > 0) {
+            console.log(`[SYNC] Updating ${productUpdates.length} product images`)
             await Promise.all(productUpdates)
+            await log(`Updated ${productUpdates.length} product images`, "info")
         }
+
+        await log(`Batch summary: ${matchedCount} matched, ${unmatchedBatch.length} unmatched`, "info")
 
         // Update Progress (Incrementally)
         if (jobId) {
-            // We need to increment the processed_items count. 
-            // Since we can't do "processed_items = processed_items + X" easily via JS client without RPC,
-            // we'll just read it first (we did above, but let's be safe) or use an RPC if available.
-            // For now, let's just read-modify-write, assuming single-threaded execution per job.
             const { data: currentJob } = await supabase.from('integration_sync_jobs').select('processed_items').eq('id', jobId).single()
             const newTotal = (currentJob?.processed_items || 0) + processedCount
             
+            console.log(`[SYNC] Updating progress: ${newTotal} total processed`)
             await supabase.from('integration_sync_jobs').update({
                 processed_items: newTotal,
                 updated_at: new Date().toISOString()
@@ -235,33 +264,43 @@ serve(async (req) => {
 
       // 5. Check for Next Page
       if (nextPageInfo) {
+          console.log(`[SYNC] More pages available, triggering next batch`)
           await log(`Batch complete. Processed ${processedCount}. Starting next batch...`, "info")
           
           // Invoke Function Again (Recursive)
           const functionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/shopify-product-sync`
           
-          // We don't await this fetch because we want to return the current response and let the next one run independently
-          // BUT, EdgeRuntime.waitUntil keeps the current execution alive.
-          // Actually, we SHOULD await it if we want to chain them sequentially to avoid hitting rate limits too hard.
-          // But if we await, we might hit the execution time limit of THIS function.
-          // So we fire and forget.
-          
-          fetch(functionUrl, {
-              method: 'POST',
-              headers: {
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                  sync_id,
-                  jobId,
-                  integrationId,
-                  page_info: nextPageInfo
-              })
-          }).catch(e => console.error("Failed to trigger next batch", e))
+          try {
+            console.log(`[SYNC] Calling ${functionUrl} for next page`)
+            const res = await fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sync_id,
+                    jobId,
+                    integrationId,
+                    page_info: nextPageInfo
+                })
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                console.error(`[SYNC] Failed to trigger next batch: ${res.status} ${text}`)
+                throw new Error(`Failed to trigger next batch: ${res.status} ${text}`)
+            }
+            console.log(`[SYNC] Successfully triggered next batch`)
+            await log(`Triggered next batch successfully.`, "info")
+          } catch (e: any) {
+             console.error("[SYNC] Failed to trigger next batch", e)
+             await log(`Error triggering next batch: ${e.message}`, "error")
+             throw e // Re-throw to mark job as failed
+          }
 
       } else {
           // No more pages - Complete!
+          console.log(`[SYNC] No more pages, marking job as completed`)
           if (jobId) {
             await supabase.from('integration_sync_jobs').update({
               status: 'completed',
@@ -272,10 +311,11 @@ serve(async (req) => {
       }
 
     } catch (error: any) {
-      console.error(error)
+      console.error('[SYNC] Error in sync process:', error)
       
       // Try to update job status if we have an ID
       if (jobId) {
+           console.log(`[SYNC] Marking job ${jobId} as failed`)
            await supabase.from('integration_sync_jobs').update({
               status: 'failed',
               error_message: error.message,
@@ -287,7 +327,7 @@ serve(async (req) => {
               level: 'error',
               event_type: 'product_sync',
               message: `Sync Failed: ${error.message}`,
-              details: { sync_id, jobId, error: error.message }
+              details: { sync_id, jobId, error: error.message, stack: error.stack }
            })
       }
     }
