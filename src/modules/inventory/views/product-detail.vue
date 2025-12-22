@@ -497,12 +497,12 @@ const getIntegrationUrl = (link: any) => {
                     <div class="text-xl font-bold mb-4">Pricing</div>
                     <div class="grid formgrid p-fluid">
                         <div class="field col-12 md:col-6 flex flex-column gap-2">
-                            <label class="font-bold">Cost Price</label>
-                            <InputNumber v-model="product.cost_price" mode="currency" currency="USD" locale="en-US" />
-                        </div>
-                        <div class="field col-12 md:col-6 flex flex-column gap-2">
                             <label class="font-bold">List Price</label>
                             <InputNumber v-model="product.retail_price" mode="currency" currency="USD" locale="en-US" />
+                        </div>
+                        <div class="field col-12 md:col-6 flex flex-column gap-2">
+                            <label class="font-bold">Cost Price</label>
+                            <InputNumber v-model="product.cost_price" mode="currency" currency="USD" locale="en-US" />
                         </div>
                         <div class="field col-12 md:col-6 flex flex-column gap-2">
                             <label class="font-bold">Sale Price</label>
