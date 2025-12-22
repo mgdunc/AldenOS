@@ -64,6 +64,33 @@ const importSelected = async () => {
     importing.value = false
 }
 
+const importAll = async () => {
+    if (unmatchedProducts.value.length === 0) return
+    selectedProducts.value = [...unmatchedProducts.value]
+    await importSelected()
+}
+
+const deleteSelected = async () => {
+    if (selectedProducts.value.length === 0) return
+    
+    importing.value = true
+    const ids = selectedProducts.value.map(p => p.id)
+    
+    const { error } = await supabase
+        .from('integration_unmatched_products')
+        .delete()
+        .in('id', ids)
+    
+    if (error) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete products' })
+    } else {
+        toast.add({ severity: 'success', summary: 'Deleted', detail: `Removed ${ids.length} products` })
+        selectedProducts.value = []
+        fetchUnmatched()
+    }
+    importing.value = false
+}
+
 onMounted(() => {
     fetchUnmatched()
 })
@@ -73,14 +100,34 @@ onMounted(() => {
     <div class="card">
         <Toolbar class="mb-4">
             <template #start>
-                <Button 
-                    label="Import Selected" 
-                    icon="pi pi-plus" 
-                    severity="success" 
-                    :disabled="!selectedProducts || selectedProducts.length === 0" 
-                    :loading="importing"
-                    @click="importSelected"
-                />
+                <div class="flex gap-2">
+                    <Button 
+                        label="Import Selected" 
+                        icon="pi pi-plus" 
+                        severity="success" 
+                        :disabled="!selectedProducts || selectedProducts.length === 0" 
+                        :loading="importing"
+                        @click="importSelected"
+                    />
+                    <Button 
+                        label="Import All" 
+                        icon="pi pi-check-circle" 
+                        severity="success" 
+                        outlined
+                        :disabled="unmatchedProducts.length === 0" 
+                        :loading="importing"
+                        @click="importAll"
+                    />
+                    <Button 
+                        label="Delete Selected" 
+                        icon="pi pi-trash" 
+                        severity="danger" 
+                        outlined
+                        :disabled="!selectedProducts || selectedProducts.length === 0" 
+                        :loading="importing"
+                        @click="deleteSelected"
+                    />
+                </div>
             </template>
             <template #end>
                 <Button 

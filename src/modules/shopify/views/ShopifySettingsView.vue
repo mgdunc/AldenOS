@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { supabase } from '@/lib/supabase'
+import { computed, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useShopifyStore } from '../store'
+import { useShopifyIntegration } from '../composables/useShopifyIntegration'
 import ShopifyIntegrationCard from '../components/ShopifyIntegrationCard.vue'
 import ShopifyWebhooksCard from '../components/ShopifyWebhooksCard.vue'
 import ShopifyLogsCard from '../components/ShopifyLogsCard.vue'
@@ -15,44 +17,20 @@ import TabPanel from 'primevue/tabpanel'
 import Listbox from 'primevue/listbox'
 import Button from 'primevue/button'
 
-const integrations = ref<any[]>([])
-const selectedIntegration = ref<any>(null)
-const loading = ref(false)
-
-const loadIntegrations = async (targetId?: string) => {
-    loading.value = true
-    
-    // Capture current selection ID if no target provided
-    const currentId = targetId || (selectedIntegration.value?.id !== 'new' ? selectedIntegration.value?.id : null)
-
-    const { data } = await supabase
-        .from('integrations')
-        .select('*')
-        .eq('provider', 'shopify')
-        .order('created_at', { ascending: true })
-    
-    integrations.value = data || []
-    
-    if (integrations.value.length > 0) {
-        if (currentId) {
-            const found = integrations.value.find(i => i.id === currentId)
-            if (found) {
-                selectedIntegration.value = found
-            } else {
-                selectedIntegration.value = integrations.value[0]
-            }
-        } else if (!selectedIntegration.value || selectedIntegration.value.id === 'new') {
-             selectedIntegration.value = integrations.value[0]
-        }
-    } else {
-        selectedIntegration.value = null
-    }
-
-    loading.value = false
-}
+const store = useShopifyStore()
+const { integrations, selectedIntegration, loading } = storeToRefs(store)
+const { loadIntegrations } = useShopifyIntegration()
 
 const createNew = () => {
-    selectedIntegration.value = { id: 'new', settings: { shop_url: '' } }
+    store.setSelectedIntegration({ 
+        id: 'new', 
+        provider: 'shopify',
+        name: '',
+        settings: { shop_url: '', access_token: '' },
+        is_active: true,
+        created_at: '',
+        updated_at: ''
+    } as any)
 }
 
 const onSaved = (savedId?: string) => {

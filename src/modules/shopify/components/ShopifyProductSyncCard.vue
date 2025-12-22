@@ -1,191 +1,38 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { supabase } from '@/lib/supabase'
-import { useToast } from 'primevue/usetoast'
+import { useShopifySync } from '../composables/useShopifySync'
 import Button from 'primevue/button'
 import ProgressBar from 'primevue/progressbar'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 
 const props = defineProps<{
     integrationId: string
 }>()
 
-const toast = useToast()
-const syncing = ref(false)
-const lastSyncResult = ref<any>(null)
-const liveLogs = ref<string[]>([])
-const history = ref<any[]>([])
-const loadingHistory = ref(false)
-const currentJob = ref<any>(null)
-let logChannel: RealtimeChannel | null = null
-let jobChannel: RealtimeChannel | null = null
+const {
+  syncing,
+  currentJob,
+  history,
+  liveLogs,
+  loadingHistory,
+  progressPercentage,
+  isRunning,
+  canCancel,
+  startSync,
+  cancelSync,
+  clearLogs
+} = useShopifySync(props.integrationId, 'product_sync')
 
-const progressPercentage = computed(() => {
-  if (!currentJob.value || !currentJob.value.total_items) return 0
-  const processed = currentJob.value.processed_items || 0
-  const total = currentJob.value.total_items
-  const pct = Math.round((processed / total) * 100)
-  return isNaN(pct) ? 0 : pct
-})
-
-const estimatedTimeRemaining = computed(() => {
-  if (!currentJob.value || !currentJob.value.started_at || !currentJob.value.processed_items) return null
-  
-  const startTime = new Date(currentJob.value.started_at).getTime()
-  const now = new Date().getTime()
-  const elapsed = now - startTime // ms
-  
-  const rate = currentJob.value.processed_items / elapsed // items per ms
-  const remainingItems = currentJob.value.total_items - currentJob.value.processed_items
-  
-  if (rate === 0) return null
-  
-  const remainingMs = remainingItems / rate
-  const remainingSec = Math.ceil(remainingMs / 1000)
-  
-  if (remainingSec < 60) return `${remainingSec}s`
-  return `${Math.ceil(remainingSec / 60)}m`
-})
-
-const fetchHistory = async () => {
-  loadingHistory.value = true
-  let query = supabase
-    .from('integration_sync_jobs')
-    .select('*')
-    .eq('integration_type', 'shopify')
-    .order('created_at', { ascending: false })
-    .limit(10)
-  
-  // Filter by integration ID if possible (requires metadata column to be indexed or small dataset)
-  // For now, we'll filter client side or assume the user wants to see all shopify jobs if the DB doesn't support JSON filtering easily without indexes
-  // But let's try to use the contains operator
-  if (props.integrationId) {
-      query = query.contains('metadata', { integration_id: props.integrationId })
-  }
-
-  const { data } = await query
-  
-  if (data) history.value = data
-  loadingHistory.value = false
-}
-
-watch(() => props.integrationId, () => {
-    fetchHistory()
-})
-
-const stopSync = async () => {
-  if (!currentJob.value) return
-  await supabase.from('integration_sync_jobs').update({ status: 'cancelled' }).eq('id', currentJob.value.id)
-  toast.add({ severity: 'info', summary: 'Stopping...', detail: 'Cancellation requested. The sync will stop shortly.' })
-}
-
-const syncProducts = async () => {
-  if (!props.integrationId) {
-      toast.add({ severity: 'error', summary: 'Error', detail: 'No integration selected' })
-      return
-  }
-
-  syncing.value = true
-  lastSyncResult.value = null
-  liveLogs.value = []
-  currentJob.value = null
-  
-  // Create Job
-  const { data: job, error: jobError } = await supabase
-    .from('integration_sync_jobs')
-    .insert({ 
-        integration_type: 'shopify', 
-        status: 'pending',
-        metadata: { integration_id: props.integrationId }
-    })
-    .select()
-    .single()
-    
-  if (jobError) {
-      toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create sync job' })
-      syncing.value = false
-      return
-  }
-  
-  currentJob.value = job
-  const syncId = job.id
-
-  // Subscribe to Job Updates
-  jobChannel = supabase.channel(`job-${syncId}`)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'integration_sync_jobs', filter: `id=eq.${syncId}` }, (payload) => {
-        currentJob.value = payload.new
-        if (['completed', 'failed', 'cancelled'].includes(payload.new.status)) {
-            syncing.value = false
-            fetchHistory()
-            if (payload.new.status === 'completed') {
-                 toast.add({ severity: 'success', summary: 'Sync Complete', detail: `Processed ${payload.new.processed_items} products.` })
-            } else if (payload.new.status === 'failed') {
-                 toast.add({ severity: 'error', summary: 'Sync Failed', detail: payload.new.error_message })
-            }
-        }
-    })
-    .subscribe()
-  
-  // Subscribe to logs
-  logChannel = supabase.channel(`sync-logs-${syncId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'integration_logs',
-      },
-      (payload) => {
-        const newLog = payload.new as any
-        if (newLog.details && newLog.details.sync_id === syncId) {
-          liveLogs.value.push(`[${new Date(newLog.created_at).toLocaleTimeString()}] ${newLog.message}`)
-          // Auto-scroll to bottom
-          const logContainer = document.getElementById('log-container')
-          if (logContainer) {
-            setTimeout(() => logContainer.scrollTop = logContainer.scrollHeight, 50)
-          }
-        }
-      }
-    )
-    .subscribe()
-
-  try {
-    const { error } = await supabase.functions.invoke('shopify-product-sync', {
-      body: { sync_id: syncId, jobId: syncId, integrationId: props.integrationId }
-    })
-    
-    if (error) throw error
-    
-    toast.add({ severity: 'info', summary: 'Sync Started', detail: 'The sync process has started in the background.', life: 3000 })
-
-  } catch (err: any) {
-    console.error('Sync Error Details:', err)
-    let msg = err.message || 'Unknown error'
-    
-    // Attempt to extract message from Supabase error body if available
-    if (err.context && err.context.json) {
-        try {
-            const body = await err.context.json()
-            if (body.error) msg = body.error
-        } catch (e) { /* ignore */ }
-    }
-
-    toast.add({ severity: 'error', summary: 'Sync Start Failed', detail: msg, life: 5000 })
-    syncing.value = false // Only reset if invocation failed immediately
+const getStatusSeverity = (status: string) => {
+  switch (status) {
+    case 'completed': return 'success'
+    case 'failed': return 'danger'
+    case 'cancelled': return 'warn'
+    case 'running': return 'info'
+    default: return 'secondary'
   }
 }
-
-onMounted(() => {
-  fetchHistory()
-})
-
-onUnmounted(() => {
-    if (logChannel) supabase.removeChannel(logChannel)
-    if (jobChannel) supabase.removeChannel(jobChannel)
-})
 </script>
 
 <template>
@@ -197,18 +44,18 @@ onUnmounted(() => {
       </div>
       <div class="flex gap-2">
           <Button 
-            v-if="syncing" 
+            v-if="canCancel" 
             label="Stop" 
             icon="pi pi-stop-circle" 
             severity="danger" 
             outlined
             size="small"
-            @click="stopSync" 
+            @click="cancelSync" 
           />
           <Button 
             :label="syncing ? 'Syncing' : 'Start Sync'" 
             :icon="syncing ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" 
-            @click="syncProducts" 
+            @click="startSync" 
             :disabled="syncing"
             severity="primary"
             size="small"
@@ -216,16 +63,22 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="syncing && currentJob" class="surface-100 p-3 border-round mb-4">
+    <div v-if="isRunning && currentJob" class="surface-100 p-3 border-round mb-4">
         <div class="flex justify-content-between mb-2 text-sm">
-            <span class="font-semibold">Progress: {{ currentJob.processed_items }} / {{ currentJob.total_items || '?' }}</span>
-            <Tag v-if="estimatedTimeRemaining" :value="'~' + estimatedTimeRemaining" severity="info" size="small" />
+            <span class="font-semibold">Progress: {{ currentJob.processed_items || 0 }} / {{ currentJob.total_items || '?' }}</span>
+            <Tag :value="currentJob.status" :severity="getStatusSeverity(currentJob.status)" size="small" />
         </div>
         <ProgressBar :value="progressPercentage" style="height: 12px"></ProgressBar>
     </div>
 
-    <div v-if="liveLogs.length > 0" class="surface-50 border-1 surface-border p-3 border-round mb-4 font-mono text-xs" style="max-height: 250px; overflow-y: auto; background-color: #1e1e1e; color: #d4d4d4;" id="log-container">
-      <div v-for="(log, index) in liveLogs" :key="index" class="mb-1" style="white-space: pre-wrap; word-break: break-word;">{{ log }}</div>
+    <div v-if="liveLogs.length > 0" class="mb-4">
+      <div class="flex justify-content-between align-items-center mb-2">
+        <span class="font-semibold text-sm">Live Logs</span>
+        <Button icon="pi pi-times" text rounded size="small" @click="clearLogs" />
+      </div>
+      <div class="surface-50 border-1 surface-border p-3 border-round font-mono text-xs" style="max-height: 250px; overflow-y: auto; background-color: #1e1e1e; color: #d4d4d4;" id="log-container">
+        <div v-for="(log, index) in liveLogs" :key="index" class="mb-1" style="white-space: pre-wrap; word-break: break-word;">{{ log }}</div>
+      </div>
     </div>
 
     <div class="flex align-items-center gap-2 mb-3">
@@ -233,19 +86,33 @@ onUnmounted(() => {
       <h4 class="m-0">Sync History</h4>
     </div>
     <DataTable :value="history" :loading="loadingHistory" size="small" stripedRows>
-      <Column field="created_at" header="Date">
+      <template #empty>No sync history found.</template>
+      
+      <Column field="created_at" header="Date" style="width: 25%">
         <template #body="slotProps">
           {{ new Date(slotProps.data.created_at).toLocaleString() }}
         </template>
       </Column>
-      <Column field="status" header="Status">
+      <Column field="status" header="Status" style="width: 15%">
         <template #body="slotProps">
-          <Tag :value="slotProps.data.status" :severity="slotProps.data.status === 'completed' ? 'success' : slotProps.data.status === 'failed' ? 'danger' : 'info'" />
+          <Tag :value="slotProps.data.status" :severity="getStatusSeverity(slotProps.data.status)" />
         </template>
       </Column>
-      <Column field="processed_items" header="Processed"></Column>
-      <Column field="total_items" header="Total"></Column>
-      <Column field="error_message" header="Error"></Column>
+      <Column field="processed_items" header="Processed" style="width: 15%">
+        <template #body="slotProps">
+          {{ slotProps.data.processed_items || 0 }}
+        </template>
+      </Column>
+      <Column field="matched_items" header="Matched" style="width: 15%">
+        <template #body="slotProps">
+          {{ slotProps.data.matched_items || 0 }}
+        </template>
+      </Column>
+      <Column field="error_message" header="Error" style="width: 30%">
+        <template #body="slotProps">
+          <span v-if="slotProps.data.error_message" class="text-sm text-500">{{ slotProps.data.error_message }}</span>
+        </template>
+      </Column>
     </DataTable>
   </div>
 </template>
