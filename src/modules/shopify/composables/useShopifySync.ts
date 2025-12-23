@@ -157,6 +157,29 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
     liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Starting ${jobType} for integration ${integrationId}...`)
 
     try {
+      // Check if there's already a pending/processing sync for this integration
+      const { data: existingQueue, error: checkError } = await supabase
+        .from('sync_queue')
+        .select('id, status')
+        .eq('integration_id', integrationId)
+        .eq('sync_type', jobType)
+        .in('status', ['pending', 'processing'])
+        .maybeSingle()
+
+      if (checkError) {
+        throw new Error(`Failed to check queue: ${checkError.message}`)
+      }
+
+      if (existingQueue) {
+        syncing.value = false
+        toast.add({
+          severity: 'warn',
+          summary: 'Sync Already Running',
+          detail: 'A sync for this store is already in progress'
+        })
+        return
+      }
+
       // Create a queue entry
       liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Adding sync to queue...`)
       
