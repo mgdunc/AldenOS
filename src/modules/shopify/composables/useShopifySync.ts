@@ -170,7 +170,13 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
       while (hasMore && syncing.value) {
         liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Syncing page ${pageCount}...`)
 
-        const { data, error } = await supabase.functions.invoke(functionName, {
+        const { data, error } = await supabase.functions.invoke<{
+          success: boolean
+          nextPageInfo?: string
+          jobId?: string
+          message?: string
+          error?: string
+        }>(functionName, {
           body: { 
             integrationId: integrationId,
             page_info: nextPageInfo,
