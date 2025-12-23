@@ -80,6 +80,29 @@ serve(async (req: Request) => {
         })
       }
 
+      // Create job record if this is the first page (no jobId provided)
+      if (!jobId && !page_info) {
+        const { data: newJob, error: jobError } = await supabase
+          .from('integration_sync_jobs')
+          .insert({
+            integration_id: integration.id,
+            job_type: 'product_sync',
+            status: 'pending',
+            total_items: 0,
+            processed_items: 0
+          })
+          .select()
+          .single()
+        
+        if (jobError) {
+          console.error('[SYNC] Failed to create job:', jobError)
+          await log(`Failed to create sync job: ${jobError.message}`, "error")
+        } else {
+          jobId = newJob.id
+          console.log(`[SYNC] Created new job ${jobId}`)
+        }
+      }
+
       // Only set to running if this is the first page
       if (jobId && !page_info) {
         await supabase.from('integration_sync_jobs').update({
