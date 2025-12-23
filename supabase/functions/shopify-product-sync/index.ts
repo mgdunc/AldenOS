@@ -283,13 +283,19 @@ serve(async (req: Request) => {
           
           // Invoke Function Again (Recursive)
           const functionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/shopify-product-sync`
+          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+          
+          if (!serviceRoleKey) {
+            console.error('[SYNC] ERROR: SUPABASE_SERVICE_ROLE_KEY not available')
+            throw new Error('Service role key not available for recursive call')
+          }
           
           try {
-            console.log(`[SYNC] Calling ${functionUrl} for next page`)
+            console.log(`[SYNC] Calling ${functionUrl} for next page with service key`)
             const res = await fetch(functionUrl, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    'Authorization': `Bearer ${serviceRoleKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
