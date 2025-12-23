@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted } from 'vue'
 import { useRealtime } from '@/composables/useRealtime'

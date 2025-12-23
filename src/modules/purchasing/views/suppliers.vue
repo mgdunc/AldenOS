@@ -96,7 +96,7 @@ onMounted(fetchSuppliers)
         </div>
         <template #footer>
             <Button label="Cancel" text @click="showDialog = false" />
-            <Button label="Save Supplier" @click="saveSupplier" :loading="processing" :disabled="!form.name" />
+            <Button label="Save Supplier" @click="saveSupplier" :loading="saving" :disabled="!form.name" />
         </template>
     </Dialog>
 </template>

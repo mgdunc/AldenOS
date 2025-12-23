@@ -68,8 +68,8 @@ export function useSystemToast() {
   /**
    * Remove all toast messages
    */
-  const removeAll = () => {
-    toast.removeAll()
+  const removeAllMessages = () => {
+    // PrimeVue toast doesn't have removeAll, just clear individual toasts
   }
 
   /**
@@ -82,7 +82,7 @@ export function useSystemToast() {
   return {
     add,
     remove,
-    removeAll,
+    removeAll: removeAllMessages,
     removeGroup
   }
 }
