@@ -5,7 +5,7 @@ import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
+import Tag from 'primevue/tag'
 
 const props = defineProps<{
     integrationId?: string | null
@@ -115,48 +115,94 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="card p-4 border-1 surface-border border-round">
-    <div class="flex align-items-center justify-content-between mb-4">
-      <div class="flex align-items-center gap-2">
-        <i class="pi pi-shopping-bag text-2xl text-green-500"></i>
-        <h2 class="text-xl font-bold m-0">Connection</h2>
+  <div class="surface-card shadow-2 border-round overflow-hidden">
+    <!-- Header -->
+    <div class="flex align-items-center justify-content-between p-4 surface-100 border-bottom-1 surface-border">
+      <div class="flex align-items-center gap-3">
+        <div class="flex align-items-center justify-content-center bg-green-100 border-round" style="width: 3rem; height: 3rem;">
+          <i class="pi pi-shopping-bag text-green-600 text-xl"></i>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold m-0 mb-1">Store Connection</h2>
+          <p class="text-xs text-600 m-0">Configure your Shopify store integration</p>
+        </div>
       </div>
       <div class="flex align-items-center gap-2">
-        <span class="font-semibold text-sm">{{ isActive ? 'Active' : 'Inactive' }}</span>
+        <Tag :value="isActive ? 'Active' : 'Inactive'" :severity="isActive ? 'success' : 'secondary'" />
         <ToggleSwitch v-model="isActive" inputId="active-switch" />
       </div>
     </div>
 
-    <form @submit.prevent="saveSettings">
+    <!-- Form -->
+    <form @submit.prevent="saveSettings" class="p-4">
       <div class="grid formgrid p-fluid">
         <div class="field col-12">
-          <label for="name">Integration Name *</label>
-          <InputText id="name" v-model="name" placeholder="My Shopify Store" required />
+          <label for="name" class="font-semibold text-sm mb-2 block">
+            <i class="pi pi-tag mr-2"></i>Integration Name *
+          </label>
+          <InputText 
+            id="name" 
+            v-model="name" 
+            placeholder="My Shopify Store" 
+            required 
+            autocomplete="off"
+          />
+          <small class="text-500">A friendly name to identify this store</small>
         </div>
+
         <div class="field col-12">
-          <label for="shopUrl">Shop URL *</label>
+          <label for="shopUrl" class="font-semibold text-sm mb-2 block">
+            <i class="pi pi-globe mr-2"></i>Shop URL *
+          </label>
           <InputText 
             id="shopUrl" 
             v-model="shopUrl" 
             placeholder="my-store.myshopify.com"
             :class="{ 'p-invalid': shopUrlError }"
             required 
+            autocomplete="off"
           />
-          <small v-if="shopUrlError" class="p-error">{{ shopUrlError }}</small>
-          <small v-else class="text-500">Must be a .myshopify.com domain</small>
+          <small v-if="shopUrlError" class="p-error">
+            <i class="pi pi-exclamation-circle mr-1"></i>{{ shopUrlError }}
+          </small>
+          <small v-else class="text-500">Your Shopify store domain (must end with .myshopify.com)</small>
         </div>
+
         <div class="field col-12">
-          <label for="accessToken">Admin API Access Token *</label>
-          <Password id="accessToken" v-model="accessToken" :feedback="false" toggleMask required />
+          <label for="accessToken" class="font-semibold text-sm mb-2 block">
+            <i class="pi pi-key mr-2"></i>Admin API Access Token *
+          </label>
+          <Password 
+            id="accessToken" 
+            v-model="accessToken" 
+            :feedback="false" 
+            toggleMask 
+            required 
+            autocomplete="new-password"
+            inputClass="font-mono"
+          />
+          <small class="text-500">Generate this token in your Shopify admin under Settings → Apps and sales channels → Develop apps</small>
         </div>
+
         <div class="field col-12">
-          <label for="webhookSecret">Webhook Signing Secret</label>
-          <Password id="webhookSecret" v-model="webhookSecret" :feedback="false" toggleMask />
-          <small class="text-500">Optional: Used to verify webhook authenticity</small>
+          <label for="webhookSecret" class="font-semibold text-sm mb-2 block">
+            <i class="pi pi-shield mr-2"></i>Webhook Signing Secret
+            <Tag value="Optional" severity="secondary" class="ml-2" />
+          </label>
+          <Password 
+            id="webhookSecret" 
+            v-model="webhookSecret" 
+            :feedback="false" 
+            toggleMask
+            autocomplete="new-password"
+            inputClass="font-mono"
+          />
+          <small class="text-500">Used to verify webhook authenticity. Find this in your Shopify app settings.</small>
         </div>
       </div>
 
-      <div class="flex justify-content-between align-items-center mt-3 gap-2">
+      <!-- Actions -->
+      <div class="flex flex-column sm:flex-row justify-content-between align-items-stretch sm:align-items-center gap-2 mt-4 pt-3 border-top-1 surface-border">
         <Button 
           type="button"
           label="Test Connection" 
@@ -166,13 +212,15 @@ onMounted(() => {
           :loading="testing"
           :disabled="!shopUrl || !accessToken"
           @click="handleTestConnection"
+          class="w-full sm:w-auto"
         />
         <Button 
           type="submit" 
-          label="Save" 
+          label="Save Configuration" 
           icon="pi pi-save" 
           :loading="saving"
           :disabled="!isValid"
+          class="w-full sm:w-auto"
         />
       </div>
     </form>
