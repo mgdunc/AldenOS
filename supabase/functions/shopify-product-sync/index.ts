@@ -281,35 +281,21 @@ serve(async (req: Request) => {
           console.log(`[SYNC] More pages available, triggering next batch`)
           await log(`Batch complete. Processed ${processedCount}. Starting next batch...`, "info")
           
-          // Invoke Function Again (Recursive)
-          const functionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/shopify-product-sync`
-          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-          
-          if (!serviceRoleKey) {
-            console.error('[SYNC] ERROR: SUPABASE_SERVICE_ROLE_KEY not available')
-            throw new Error('Service role key not available for recursive call')
-          }
-          
+          // Use supabase client to invoke function (bypasses JWT issues)
           try {
-            console.log(`[SYNC] Calling ${functionUrl} for next page with service key`)
-            const res = await fetch(functionUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${serviceRoleKey}`,
-                    'apikey': serviceRoleKey,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+            console.log(`[SYNC] Invoking function for next page using supabase client`)
+            const { data, error } = await supabase.functions.invoke('shopify-product-sync', {
+                body: {
                     sync_id,
                     jobId,
                     integrationId,
                     page_info: nextPageInfo
-                })
+                }
             })
-            if (!res.ok) {
-                const text = await res.text()
-                console.error(`[SYNC] Failed to trigger next batch: ${res.status} ${text}`)
-                throw new Error(`Failed to trigger next batch: ${res.status} ${text}`)
+            
+            if (error) {
+                console.error(`[SYNC] Failed to trigger next batch:`, error)
+                throw new Error(`Failed to trigger next batch: ${error.message}`)
             }
             console.log(`[SYNC] Successfully triggered next batch`)
             await log(`Triggered next batch successfully.`, "info")
