@@ -152,6 +152,7 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
   const startSync = async () => {
     syncing.value = true
     liveLogs.value = []
+    liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Starting ${jobType} for integration ${integrationId}...`)
 
     try {
       // Determine the Edge Function to call
@@ -159,15 +160,24 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
         ? 'shopify-product-sync' 
         : 'shopify-order-sync'
 
+      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Invoking Edge Function: ${functionName}`)
+
       const { data, error } = await supabase.functions.invoke(functionName, {
-        body: { integration_id: integrationId }
+        body: { integrationId: integrationId }
       })
 
-      if (error) throw error
+      if (error) {
+        liveLogs.value.push(`[${new Date().toLocaleTimeString()}] ERROR: ${error.message}`)
+        throw error
+      }
 
       if (data?.error) {
+        liveLogs.value.push(`[${new Date().toLocaleTimeString()}] ERROR: ${data.error}`)
         throw new Error(data.error)
       }
+
+      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Edge Function invoked successfully`)
+      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Response: ${JSON.stringify(data)}`)
 
       toast.add({
         severity: 'info',
@@ -176,6 +186,7 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
       })
     } catch (error: any) {
       console.error('Sync error:', error)
+      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] FATAL ERROR: ${error.message || error}`)
       syncing.value = false
       toast.add({
         severity: 'error',
