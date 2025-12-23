@@ -26,6 +26,21 @@ export class ShopifyClient {
       try {
         const res = await fetch(url, { ...options, headers: this.headers });
         
+        // Log rate limit info
+        const callLimit = res.headers.get('X-Shopify-Shop-Api-Call-Limit');
+        if (callLimit) {
+          const [used, total] = callLimit.split('/').map(Number);
+          const percentage = Math.round((used / total) * 100);
+          console.log(`[SHOPIFY] API Bucket: ${used}/${total} (${percentage}%)`);
+          
+          // If bucket is over 80% full, wait to let it drain
+          if (percentage > 80) {
+            const waitTime = 500;
+            console.log(`[SHOPIFY] Bucket at ${percentage}%, waiting ${waitTime}ms`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+        
         if (res.status === 429) {
           const retryAfter = res.headers.get('Retry-After');
           const wait = retryAfter ? parseFloat(retryAfter) * 1000 : 2000;

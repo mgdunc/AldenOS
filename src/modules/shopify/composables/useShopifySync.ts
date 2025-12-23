@@ -214,6 +214,8 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
           liveLogs.value.push(`[${new Date().toLocaleTimeString()}] All pages synced successfully.`)
         } else {
           pageCount++
+          // Add 500ms delay between pages to respect Shopify rate limits
+          await new Promise(resolve => setTimeout(resolve, 500))
         }
       }
 
