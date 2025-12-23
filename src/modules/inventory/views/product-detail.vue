@@ -630,7 +630,7 @@ const getIntegrationUrl = (link: any) => {
                         <a v-for="link in productIntegrations" :key="link.id" :href="getIntegrationUrl(link)" target="_blank" class="flex align-items-center gap-3 p-3 border-1 border-green-200 bg-green-50 border-round no-underline hover:bg-green-100 transition-colors transition-duration-200">
                             <i class="pi pi-shopping-bag text-green-600 text-2xl"></i>
                             <div class="flex-1">
-                                <div class="font-bold text-green-900">Shopify Store</div>
+                                <div class="font-bold text-green-900">{{ shopifyIntegrations.find(i => i.id === link.integration_id)?.name || 'Shopify' }}</div>
                                 <div class="text-xs text-green-700">Linked</div>
                             </div>
                             <i class="pi pi-external-link text-green-600"></i>
