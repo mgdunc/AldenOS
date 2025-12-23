@@ -25,6 +25,7 @@ export interface ShopifySyncJob {
   processed_items?: number
   matched_items?: number
   updated_items?: number
+  error_count?: number
   error_message?: string
   metadata?: Record<string, any>
   started_at?: string

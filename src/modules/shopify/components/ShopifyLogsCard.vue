@@ -135,16 +135,15 @@ onMounted(() => {
     <!-- Filters -->
     <div class="grid mb-3">
       <div class="col-12 md:col-4">
-        <InputText 
-          v-model="searchTerm" 
-          placeholder="Search logs..." 
-          class="w-full" 
-          size="small"
-        >
-          <template #prefix>
-            <i class="pi pi-search"></i>
-          </template>
-        </InputText>
+        <span class="p-input-icon-left w-full">
+          <i class="pi pi-search"></i>
+          <InputText 
+            v-model="searchTerm" 
+            placeholder="Search logs..." 
+            class="w-full" 
+            size="small"
+          />
+        </span>
       </div>
       <div class="col-12 md:col-3">
         <Dropdown 
