@@ -10,6 +10,7 @@ import ShopifyProductSyncCard from '../components/ShopifyProductSyncCard.vue'
 import ShopifyOrderSyncCard from '../components/ShopifyOrderSyncCard.vue'
 import ShopifyUnmatchedProducts from '../components/ShopifyUnmatchedProducts.vue'
 import ShopifyFunctionStatus from '../components/ShopifyFunctionStatus.vue'
+import ShopifySyncQueue from '../components/ShopifySyncQueue.vue'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -93,10 +94,11 @@ onMounted(() => {
                 <TabList>
                     <Tab value="0"><i class="pi pi-box mr-2"></i>Product Sync</Tab>
                     <Tab value="1"><i class="pi pi-shopping-cart mr-2"></i>Order Sync</Tab>
-                    <Tab value="2"><i class="pi pi-question-circle mr-2"></i>Unmatched</Tab>
-                    <Tab value="3"><i class="pi pi-history mr-2"></i>Activity Logs</Tab>
-                    <Tab value="4"><i class="pi pi-bolt mr-2"></i>Webhooks</Tab>
-                    <Tab value="5"><i class="pi pi-server mr-2"></i>Function Status</Tab>
+                    <Tab value="2"><i class="pi pi-list mr-2"></i>Sync Queue</Tab>
+                    <Tab value="3"><i class="pi pi-question-circle mr-2"></i>Unmatched</Tab>
+                    <Tab value="4"><i class="pi pi-history mr-2"></i>Activity Logs</Tab>
+                    <Tab value="5"><i class="pi pi-bolt mr-2"></i>Webhooks</Tab>
+                    <Tab value="6"><i class="pi pi-server mr-2"></i>Function Status</Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="0">
@@ -106,15 +108,18 @@ onMounted(() => {
                     <ShopifyOrderSyncCard :integration-id="selectedIntegration.id" />
                     </TabPanel>
                     <TabPanel value="2">
-                    <ShopifyUnmatchedProducts :integration-id="selectedIntegration.id" />
+                    <ShopifySyncQueue />
                     </TabPanel>
                     <TabPanel value="3">
-                    <ShopifyLogsCard :integration-id="selectedIntegration.id" />
+                    <ShopifyUnmatchedProducts :integration-id="selectedIntegration.id" />
                     </TabPanel>
                     <TabPanel value="4">
-                    <ShopifyWebhooksCard :integration-id="selectedIntegration.id" />
+                    <ShopifyLogsCard :integration-id="selectedIntegration.id" />
                     </TabPanel>
                     <TabPanel value="5">
+                    <ShopifyWebhooksCard :integration-id="selectedIntegration.id" />
+                    </TabPanel>
+                    <TabPanel value="6">
                     <ShopifyFunctionStatus :integration-id="selectedIntegration.id" />
                     </TabPanel>
                 </TabPanels>

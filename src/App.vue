@@ -103,6 +103,7 @@ const items = ref([
         items: [
             { label: 'General Settings', icon: 'pi pi-cog', route: '/settings' },
             { label: 'Shopify Integration', icon: 'pi pi-shopping-bag', route: '/settings/shopify' },
+            { label: 'Sync Queue', icon: 'pi pi-list', route: '/settings/shopify/queue' },
             { label: 'System Logs', icon: 'pi pi-exclamation-circle', route: '/dev/logs' },
         ]
     }
