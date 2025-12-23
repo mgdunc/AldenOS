@@ -135,8 +135,9 @@ serve(async (req: Request) => {
       }
 
       // Fetch ONE page
-      console.log(`[SYNC] Fetching page with limit 50, page_info: ${page_info || 'none'}`)
-      const { products, nextPageInfo } = await shopify.getProductsPage(50, page_info)
+      const limit = 250
+      console.log(`[SYNC] Fetching page with limit ${limit}, page_info: ${page_info || 'none'}`)
+      const { products, nextPageInfo } = await shopify.getProductsPage(limit, page_info)
       
       console.log(`[SYNC] Fetched ${products.length} products, nextPageInfo: ${nextPageInfo ? 'present' : 'none'}`)
       await log(`Fetched batch of ${products.length} products from Shopify.`, "info")
@@ -281,40 +282,28 @@ serve(async (req: Request) => {
           console.log(`[SYNC] More pages available, triggering next batch`)
           await log(`Batch complete. Processed ${processedCount}. Starting next batch...`, "info")
           
-          // Use direct fetch with proper auth for recursive calls
-          const functionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/shopify-product-sync`
-          const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-          
           try {
-            console.log(`[SYNC] Invoking next batch via fetch`)
-            const res = await fetch(functionUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${anonKey}`,
-                    'apikey': anonKey,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+            console.log(`[SYNC] Invoking next batch via supabase.functions.invoke`)
+            
+            const { error: invokeError } = await supabase.functions.invoke('shopify-product-sync', {
+                body: {
                     sync_id,
                     jobId,
                     integrationId,
                     page_info: nextPageInfo
-                })
+                }
             })
             
-            if (!res.ok) {
-                const text = await res.text()
-                console.error(`[SYNC] Failed to trigger next batch: ${res.status} ${text}`)
-                await log(`Failed to trigger next batch: ${res.status}. Sync incomplete.`, "warning")
-                // Don't throw - just log and let this batch complete successfully
+            if (invokeError) {
+                console.error(`[SYNC] Failed to trigger next batch:`, invokeError)
+                await log(`Failed to trigger next batch: ${invokeError.message || invokeError}. Sync incomplete.`, "warning")
             } else {
                 console.log(`[SYNC] Successfully triggered next batch`)
                 await log(`Triggered next batch successfully.`, "info")
             }
           } catch (e: any) {
-             console.error("[SYNC] Failed to trigger next batch", e)
+             console.error("[SYNC] Failed to trigger next batch (exception)", e)
              await log(`Error triggering next batch: ${e.message}. Sync incomplete.`, "warning")
-             // Don't throw - just log and let this batch complete successfully
           }
 
       } else {
