@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'vue-router'
-import { useToast } from 'primevue/usetoast'
+import { useFulfillment } from '../composables/useFulfillment'
+import { useFulfillmentStore } from '../store'
+import { useResponsive } from '@/composables/useResponsive'
+import { useErrorHandler } from '@/composables/useErrorHandler'
+import { storeToRefs } from 'pinia'
 
 // PrimeVue
 import DataTable from 'primevue/datatable'
@@ -14,27 +17,14 @@ import { getStatusSeverity } from '@/lib/statusHelpers'
 import { formatDate } from '@/lib/formatDate'
 
 const router = useRouter()
-const toast = useToast()
-const fulfillments = ref<any[]>([])
-const loading = ref(true)
-
+const { loadFulfillments } = useFulfillment()
+const store = useFulfillmentStore()
+const { fulfillments, loading } = storeToRefs(store)
+const { isMobile, isTablet } = useResponsive()
+const { handleError } = useErrorHandler()
 
 const fetchFulfillments = async () => {
-    loading.value = true
-    const { data, error } = await supabase
-        .from('fulfillments')
-        .select(`
-            *,
-            sales_orders ( order_number, customer_name )
-        `)
-        .order('created_at', { ascending: false })
-
-    if (error) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Could not load fulfillments' })
-    } else {
-        fulfillments.value = data || []
-    }
-    loading.value = false
+    await loadFulfillments()
 }
 
 const navigateToDetail = (id: string) => {
@@ -54,7 +44,17 @@ onMounted(() => {
         </div>
 
         <div class="card shadow-2 p-0 border-round overflow-hidden surface-card">
-            <DataTable :value="fulfillments" stripedRows :loading="loading" paginator :rows="10" selectionMode="single" @rowSelect="(e: any) => navigateToDetail(e.data.id)">
+            <DataTable 
+                :value="fulfillments" 
+                stripedRows 
+                :loading="loading" 
+                paginator 
+                :rows="10" 
+                selectionMode="single" 
+                @rowSelect="(e: any) => navigateToDetail(e.data.id)"
+                :scrollable="!isMobile"
+                responsiveLayout="scroll"
+            >
                 <template #empty>No fulfillments found.</template>
                 
                 <Column field="fulfillment_number" header="Fulfillment #" sortable class="font-bold" />

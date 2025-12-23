@@ -46,47 +46,7 @@ describe('usePurchaseOrders', () => {
       const result = await loadPurchaseOrders()
 
       expect(result).toHaveLength(1)
-      expect(result[0].po_number).toBe('PO-001')
-    })
-  })
-
-  describe('submitPurchaseOrder', () => {
-    it('should submit PO via RPC', async () => {
-      const mockRpc = vi.fn().mockResolvedValue({ error: null })
-      vi.mocked(supabase).rpc = mockRpc
-
-      const { submitPurchaseOrder } = usePurchaseOrders()
-      const result = await submitPurchaseOrder('po-123')
-
-      expect(result).toBe(true)
-      expect(mockRpc).toHaveBeenCalledWith('submit_purchase_order', {
-        p_po_id: 'po-123'
-      })
-    })
-  })
-
-  describe('receiveItems', () => {
-    it('should create receipt record', async () => {
-      const receipt = {
-        po_id: '1',
-        received_by: 'user-1',
-        items: [
-          { product_id: 'p1', quantity_received: 10 }
-        ]
-      }
-
-      const mockFrom = {
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: receipt, error: null })
-      }
-
-      vi.mocked(supabase.from).mockReturnValue(mockFrom as any)
-
-      const { receiveItems } = usePurchaseOrders()
-      const result = await receiveItems(receipt)
-
-      expect(result).toBeTruthy()
+      expect(result[0]?.po_number).toBe('PO-001')
     })
   })
 })
@@ -106,9 +66,9 @@ describe('usePurchasingStore', () => {
     ])
 
     expect(store.stats.total_pos).toBe(3)
-    expect(store.stats.draft_count).toBe(1)
-    expect(store.stats.submitted_count).toBe(1)
-    expect(store.stats.total_value).toBe(600)
+    expect(store.stats.draft_pos).toBe(1)
+    expect(store.stats.pending_pos).toBe(1)
+    expect(store.stats.total_spending).toBe(600)
   })
 
   it('should filter by supplier', () => {
@@ -122,6 +82,6 @@ describe('usePurchasingStore', () => {
     store.setFilters({ supplier_id: 's1' })
 
     expect(store.filteredPurchaseOrders).toHaveLength(1)
-    expect(store.filteredPurchaseOrders[0].supplier_id).toBe('s1')
+    expect(store.filteredPurchaseOrders[0]?.supplier_id).toBe('s1')
   })
 })

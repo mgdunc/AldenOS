@@ -7,10 +7,10 @@
 
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { supabase } from '@/lib/supabase'
-import { useToast } from 'primevue/usetoast'
+import { useReceiving } from '../composables/useReceiving'
 import { useConfirm } from 'primevue/useconfirm'
 import { formatDate } from '@/lib/formatDate'
+import type { InventoryReceiptWithRelations, InventoryReceiptLineWithRelations } from '../types'
 
 // --- Components ---
 import Button from 'primevue/button'
@@ -23,47 +23,24 @@ import PurchaseOrderDetailView from '@/modules/purchasing/views/purchase-order-d
 
 const route = useRoute()
 const router = useRouter()
-const toast = useToast()
 const confirm = useConfirm()
+const { loadReceiptById, cancelReceipt: cancelReceiptRpc, loading } = useReceiving()
 
 const receiptId = route.params.id as string
-const receipt = ref<any>(null)
-const lines = ref<any[]>([])
-const loading = ref(true)
+const receipt = ref<InventoryReceiptWithRelations | null>(null)
+const lines = ref<InventoryReceiptLineWithRelations[]>([])
 const showPoDialog = ref(false)
 
 const fetchReceiptData = async () => {
-    loading.value = true
+    const result = await loadReceiptById(receiptId)
     
-    // 1. Fetch Receipt Header
-    const { data: header, error: headErr } = await supabase
-        .from('inventory_receipts')
-        .select(`
-            *,
-            purchase_orders ( id, po_number, status, supplier_name )
-        `)
-        .eq('id', receiptId)
-        .maybeSingle()
-
-    if (headErr || !header) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Receipt not found' })
+    if (!result.receipt) {
         router.push('/receipts')
         return
     }
-    receipt.value = header
-
-    // 2. Fetch Receipt Lines (The Audit Log)
-    const { data: lineData } = await supabase
-        .from('inventory_receipt_lines')
-        .select(`
-            *,
-            products ( sku, name ),
-            locations ( name )
-        `)
-        .eq('receipt_id', receiptId)
-
-    lines.value = lineData || []
-    loading.value = false
+    
+    receipt.value = result.receipt
+    lines.value = result.lines
 }
 
 const goToPO = () => {
@@ -93,14 +70,8 @@ const cancelReceipt = () => {
             severity: 'danger'
         },
         accept: async () => {
-            loading.value = true
-            const { error } = await supabase.rpc('revert_inventory_receipt', { p_receipt_id: receiptId })
-            
-            if (error) {
-                toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-                loading.value = false
-            } else {
-                toast.add({ severity: 'success', summary: 'Success', detail: 'Receipt cancelled successfully' })
+            const success = await cancelReceiptRpc(receiptId)
+            if (success) {
                 router.push('/receipts')
             }
         }
@@ -140,7 +111,7 @@ onMounted(() => fetchReceiptData())
             <div class="col-12 md:col-6">
                 <div class="surface-card p-3 border-round shadow-1 h-full">
                     <div class="text-500 font-medium text-sm mb-2">Vendor Details</div>
-                    <div class="font-bold text-xl">{{ receipt.purchase_orders?.suppliers?.name || receipt.purchase_orders?.supplier_name }}</div>
+                    <div class="font-bold text-xl">{{ receipt.purchase_orders?.supplier_name }}</div>
                     <div class="text-600 flex align-items-center gap-2 mt-1">
                         <span>PO: {{ receipt.purchase_orders?.po_number }}</span>
                         <Button icon="pi pi-external-link" text rounded size="small" @click="goToPO" v-tooltip="'View Purchase Order'" />

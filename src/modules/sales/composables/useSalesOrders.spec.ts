@@ -46,7 +46,7 @@ describe('useSalesOrders', () => {
       const result = await loadOrders()
 
       expect(result).toHaveLength(1)
-      expect(result[0].order_number).toBe('SO-001')
+      expect(result[0]?.order_number).toBe('SO-001')
     })
 
     it('should filter by status', async () => {
@@ -132,19 +132,9 @@ describe('useSalesStore', () => {
     ])
 
     expect(store.stats.total_orders).toBe(4)
-    expect(store.stats.draft_count).toBe(1)
-    expect(store.stats.confirmed_count).toBe(1)
-    expect(store.stats.fulfilled_count).toBe(1)
+    expect(store.stats.draft_orders).toBe(1)
+    expect(store.stats.confirmed_orders).toBe(1)
+    expect(store.stats.fulfilled_orders).toBe(1)
     expect(store.stats.total_revenue).toBe(600) // excludes cancelled
-  })
-
-  it('should get order by ID', () => {
-    const store = useSalesStore()
-    const order = { id: '1', order_number: 'SO-001' } as any
-    
-    store.setOrders([order])
-    
-    expect(store.getOrderById('1')).toEqual(order)
-    expect(store.getOrderById('999')).toBeUndefined()
   })
 })

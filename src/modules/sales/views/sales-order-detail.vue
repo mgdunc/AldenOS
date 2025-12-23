@@ -17,6 +17,8 @@ import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { formatCurrency } from '@/lib/formatCurrency'
 import { formatDate } from '@/lib/formatDate'
+import { useResponsive } from '@/composables/useResponsive'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 // Custom Components
 import AddProductDialog from '@/modules/inventory/components/AddProductDialog.vue' 
@@ -37,18 +39,34 @@ import ProgressBar from 'primevue/progressbar'
 
 import { getStatusSeverity } from '@/lib/statusHelpers'
 import { useSalesOrder } from '@/modules/sales/composables/useSalesOrder'
+import { useSalesOrders } from '@/modules/sales/composables/useSalesOrders'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
+const { isMobile, isTablet } = useResponsive()
+const { handleError } = useErrorHandler()
+
+// Use composable
+const {
+  loading,
+  saving,
+  loadOrderDetails,
+  updateOrder: updateOrderComposable,
+  updateOrderLine,
+  deleteOrderLine,
+  addProductToOrder,
+  confirmOrder: confirmOrderComposable,
+  cancelOrder: cancelOrderComposable,
+  revertToDraft: revertToDraftComposable
+} = useSalesOrders()
 
 const order = ref<any>(null)
 const lines = ref<any[]>([])
 const fulfillments = ref<any[]>([])
 const incomingStock = ref<any>({}) 
-const loading = ref(true)
-const processing = ref(false) 
+const processing = ref(false)
 const orderId = route.params.id as string
 
 // Use Composable
@@ -118,121 +136,44 @@ const hasFulfillments = computed(() => fulfillments.value.length > 0)
 // --- DATA FETCHING ---
 
 /**
- * Fetches all necessary data for the order view.
- * Strategies:
- * 1. Parallel fetching of Order Header and Fulfillments for speed.
- * 2. Sequential fetching of Lines to get Product IDs.
- * 3. Bulk fetching of Stock and Incoming POs using Product IDs to minimize DB calls.
+ * Fetches all necessary data for the order view using composable
  */
 const fetchOrderData = async () => {
-    loading.value = true
-    try {
-        // 1. Fetch Order Header & Fulfillments in parallel
-        const [orderRes, fulfillRes] = await Promise.all([
-            supabase.from('sales_orders').select('*, billing_address, shipping_address').eq('id', orderId).single(),
-            supabase.from('fulfillments').select('*').eq('sales_order_id', orderId).order('created_at', { ascending: false })
-        ])
-
-        if (orderRes.error) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Order not found.' })
-            router.push('/sales'); 
-            loading.value = false;
-            return;
-        }
-
-        order.value = orderRes.data
-        fulfillments.value = fulfillRes.data || [] 
-
-        // 2. Fetch Lines 
-        const linesRes = await supabase
-            .from('sales_order_lines')
-            .select(`*, products (id, sku, name, list_price)`)
-            .eq('sales_order_id', orderId)
-            .order('created_at', { ascending: true })
-        
-        const rawLines = linesRes.data || []
-
-        // 3. Extract IDs to make the stock query efficient
-        // We only want stock for the products actually in this order
-        const productIds = rawLines.map(l => l.product_id).filter(id => id)
-
-        // 4. Fetch Stock from the VIEW (Architecture Alignment)
-        let availMap: Record<string, number> = {}
-        let fulfillMap: Record<string, any> = {}
-
-        if (productIds.length > 0) {
-            // A. Get Available Stock
-            const { data: stockData } = await supabase
-                .from('product_inventory_view') 
-                .select('product_id, available') 
-                .in('product_id', productIds)
-
-            stockData?.forEach(row => {
-                availMap[row.product_id] = row.available
-            })
-
-            // B. Get Fulfillment Quantities
-            const { data: fulfillQty } = await supabase
-                .rpc('get_line_fulfillment_qty', { p_order_id: orderId })
-            
-            fulfillQty?.forEach((row: any) => {
-                fulfillMap[row.line_id] = row
-            })
-        }
-        
-        // 5. Map Data
-        lines.value = rawLines.map(l => ({ 
-            ...l, 
-            available_now: (availMap[l.product_id] ?? 0),
-            qty_allocated: l.quantity_allocated || 0,
-            qty_in_fulfillment: (fulfillMap[l.id]?.qty_in_fulfillment ?? 0),
-            qty_shipped: (fulfillMap[l.id]?.qty_shipped ?? 0),
-            line_total: (l.quantity_ordered * l.unit_price) 
-        }))
-
-        // 6. Fetch Incoming POs (Optimized)
-        if (productIds.length > 0) {
-            const { data: incoming } = await supabase
-                .from('purchase_order_lines')
-                .select('product_id, quantity_ordered, purchase_orders!inner(po_number, expected_date, status)')
-                .in('product_id', productIds)
-                .eq('purchase_orders.status', 'placed')
-
-            // 7. Map Incoming
-            let incomingMap: Record<string, any[]> = {}
-            incoming?.forEach((row: any) => {
-                if (!incomingMap[row.product_id]) incomingMap[row.product_id] = []
-                incomingMap[row.product_id]!.push({
-                    po: row.purchase_orders.po_number,
-                    date: row.purchase_orders.expected_date,
-                    qty: row.quantity_ordered
-                })
-            })
-            incomingStock.value = incomingMap
-        }
-    } catch (e) {
-        console.error(e)
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load order data' })
-    } finally {
-        loading.value = false
+    const result = await loadOrderDetails(orderId)
+    
+    if (!result) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Order not found.' })
+        router.push('/sales')
+        return
     }
+
+    order.value = result.order
+    lines.value = result.lines
+    fulfillments.value = result.fulfillments
+    incomingStock.value = result.incomingStock
 }
 
 // --- ACTIONS ---
 
 const updateOrder = async () => {
-    const { error } = await supabase.from('sales_orders').update({ 
+    const success = await updateOrderComposable(orderId, {
         billing_address: order.value.billing_address,
         shipping_address: order.value.shipping_address
-    }).eq('id', orderId)
+    })
     
-    if (error) toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to save address.' })
-    else toast.add({ severity: 'success', summary: 'Saved', detail: 'Address updated.' })
+    if (success) {
+        toast.add({ severity: 'success', summary: 'Saved', detail: 'Address updated.' })
+    }
 }
 
 const saveDispatchDate = async () => {
-    const { error } = await supabase.from('sales_orders').update({ dispatch_date: order.value.dispatch_date }).eq('id', orderId)
-    if (!error) toast.add({ severity: 'success', summary: 'Saved', detail: 'Dispatch date updated.' })
+    const success = await updateOrderComposable(orderId, {
+        dispatch_date: order.value.dispatch_date
+    })
+    
+    if (success) {
+        toast.add({ severity: 'success', summary: 'Saved', detail: 'Dispatch date updated.' })
+    }
 }
 
 const applySuggestedDate = () => {
@@ -255,12 +196,10 @@ const revertToDraft = () => {
         acceptClass: 'p-button-danger',
         accept: async () => {
             processing.value = true;
-            const { error } = await supabase.from('sales_orders').update({ status: 'draft' }).eq('id', orderId);
+            const success = await revertToDraftComposable(orderId);
             processing.value = false;
 
-            if (error) toast.add({ severity: 'error', summary: 'Error', detail: error.message });
-            else {
-                toast.add({ severity: 'success', summary: 'Reverted', detail: 'Order is now in Draft.' });
+            if (success) {
                 await fetchOrderData();
             }
         }
@@ -280,12 +219,10 @@ const cancelOrder = () => {
         acceptClass: 'p-button-danger',
         accept: async () => {
             processing.value = true;
-            const { error } = await supabase.from('sales_orders').update({ status: 'cancelled' }).eq('id', orderId);
+            const success = await cancelOrderComposable(orderId);
             processing.value = false;
 
-            if (error) toast.add({ severity: 'error', summary: 'Error', detail: error.message });
-            else {
-                toast.add({ severity: 'success', summary: 'Cancelled', detail: 'Order cancelled.' });
+            if (success) {
                 await fetchOrderData();
             }
         }
@@ -298,22 +235,18 @@ const confirmOrder = async () => {
 
     // Save all lines first to ensure latest edits are persisted
     const updates = lines.value.map(line => 
-        supabase.from('sales_order_lines')
-            .update({ quantity_ordered: line.quantity_ordered, unit_price: line.unit_price })
-            .eq('id', line.id)
+        updateOrderLine(line.id, {
+            quantity_ordered: line.quantity_ordered,
+            unit_price: line.unit_price
+        })
     );
     await Promise.all(updates);
 
-    // We pass 'reserved' as intent, but the function decides based on availability
-    // Uses an RPC to handle the complex logic of checking stock and updating status atomically
-    const { error } = await supabase.rpc('allocate_inventory_and_confirm_order', { 
-        p_order_id: orderId, 
-        p_new_status: 'reserved',
-        p_idempotency_key: self.crypto.randomUUID()
-    });
+    // Use composable to confirm order
+    const result = await confirmOrderComposable(orderId);
     processing.value = false;
-    if (error) toast.add({ severity: 'error', summary: 'Error', detail: error.message });
-    else {
+    
+    if (result) {
         toast.add({ severity: 'success', summary: 'Processed', detail: 'Inventory allocation updated.' });
         await fetchOrderData();
     }
@@ -424,7 +357,10 @@ const updateLineItem = async (line: any) => {
         await fetchOrderData(); 
         return;
     }
-    await supabase.from('sales_order_lines').update({ quantity_ordered: line.quantity_ordered, unit_price: line.unit_price }).eq('id', line.id);
+    await updateOrderLine(line.id, {
+        quantity_ordered: line.quantity_ordered,
+        unit_price: line.unit_price
+    });
 }
 
 const deleteLine = (lineId: string) => {
@@ -441,20 +377,19 @@ const deleteLine = (lineId: string) => {
         icon: 'pi pi-trash',
         acceptClass: 'p-button-danger',
         accept: async () => {
-            await supabase.from('sales_order_lines').delete().eq('id', lineId)
-            await fetchOrderData();
+            const success = await deleteOrderLine(lineId);
+            if (success) {
+                await fetchOrderData();
+            }
         }
     });
 }
 
 const onProductSelected = async (product: any) => {
-    const { data: existing } = await supabase.from('sales_order_lines').select('*').eq('sales_order_id', orderId).eq('product_id', product.id).maybeSingle()
-    if (existing) {
-        await supabase.from('sales_order_lines').update({ quantity_ordered: existing.quantity_ordered + 1 }).eq('id', existing.id);
-    } else {
-        await supabase.from('sales_order_lines').insert({ sales_order_id: orderId, product_id: product.id, quantity_ordered: 1, unit_price: product.list_price || 0 })
+    const success = await addProductToOrder(orderId, product.id, product.list_price || 0);
+    if (success) {
+        await fetchOrderData();
     }
-    await fetchOrderData()
 }
 
 // Generates the data for the multi-colored progress bar
@@ -610,8 +545,14 @@ onMounted(() => fetchOrderData())
                     @click="showNewLineDialog = true" 
                 />
             </template>
-            <DataTable :value="lines" stripedRows showGridlines scrollable>
-                <Column field="products.sku" header="SKU" style="min-width: 7rem">
+            <DataTable 
+                :value="lines" 
+                stripedRows 
+                showGridlines 
+                :scrollable="!isMobile"
+                responsiveLayout="scroll"
+            >
+                <Column v-if="!isMobile" field="products.sku" header="SKU" style="min-width: 7rem">
                     <template #body="{ data }">
                         <router-link v-if="data.products" :to="`/product/${data.products.id}`" class="text-primary font-bold no-underline hover:underline">
                             {{ data.products.sku }}

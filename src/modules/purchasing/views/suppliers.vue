@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
+import { usePurchaseOrders } from '../composables/usePurchaseOrders'
 import { FilterMatchMode } from '@primevue/core/api'
 
 // PrimeVue
@@ -12,10 +12,9 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 
 const toast = useToast()
+const { loadSuppliers, createSupplier, loading, saving } = usePurchaseOrders()
 const suppliers = ref<any[]>([])
-const loading = ref(true)
 const showDialog = ref(false)
-const processing = ref(false)
 
 // Form
 const form = ref({
@@ -30,24 +29,16 @@ const filters = ref({
 })
 
 const fetchSuppliers = async () => {
-    loading.value = true
-    const { data, error } = await supabase.from('suppliers').select('*').order('name')
-    if (error) toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to fetch suppliers' })
-    else suppliers.value = data || []
-    loading.value = false
+    const data = await loadSuppliers()
+    suppliers.value = data
 }
 
 const saveSupplier = async () => {
     if (!form.value.name) return;
-    processing.value = true
     
-    const { error } = await supabase.from('suppliers').insert(form.value)
+    const result = await createSupplier(form.value)
     
-    processing.value = false
-    if (error) {
-        toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-    } else {
-        toast.add({ severity: 'success', summary: 'Saved', detail: 'Supplier added.' })
+    if (result) {
         showDialog.value = false
         form.value = { name: '', contact_name: '', email: '', phone: '' } // Reset
         await fetchSuppliers()

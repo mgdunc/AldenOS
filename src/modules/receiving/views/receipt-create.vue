@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { formatDate } from '@/lib/formatDate'
+import { useReceiving } from '@/modules/receiving/composables/useReceiving'
 
 // PrimeVue
 import Button from 'primevue/button'
@@ -21,11 +21,19 @@ const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
 
+// Use composable
+const {
+  loading,
+  saving,
+  loadPurchaseOrderForReceipt,
+  processReceipt,
+  updatePurchaseOrderStatus
+} = useReceiving()
+
 const poId = route.query.po_id as string
 const po = ref<any>(null)
 const lines = ref<any[]>([])
 const locations = ref<any[]>([])
-const loading = ref(true)
 const processing = ref(false)
 const notes = ref('')
 
@@ -36,50 +44,20 @@ const fetchData = async () => {
         return
     }
 
-    loading.value = true
-
-    // 1. Fetch PO Header
-    const { data: poData, error: poError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('id', poId)
-        .single()
-
-    if (poError || !poData) {
+    const result = await loadPurchaseOrderForReceipt(poId)
+    
+    if (!result.po) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Purchase Order not found.' })
         router.push('/receipts')
         return
     }
-    po.value = poData
 
-    // 2. Fetch Locations
-    const { data: locData } = await supabase.from('locations').select('id, name').order('name')
-    locations.value = locData || []
-    const defaultLocation = locations.value.find(l => l.name === 'Default' || l.name === 'Warehouse') || locations.value[0]
-
-    // 3. Fetch PO Lines
-    const { data: lineData } = await supabase
-        .from('purchase_order_lines')
-        .select(`*, products (sku, name)`)
-        .eq('purchase_order_id', poId)
-
-    // 4. Prepare Receipt Lines
-    lines.value = (lineData || []).map(l => ({
-        po_line_id: l.id,
-        product_id: l.product_id,
-        sku: l.products.sku,
-        name: l.products.name,
-        qty_ordered: l.quantity_ordered,
-        qty_received_prev: l.quantity_received || 0,
-        // Default to remaining quantity
-        qty_to_receive: Math.max(0, l.quantity_ordered - (l.quantity_received || 0)),
-        location_id: defaultLocation?.id
-    }))
-
-    loading.value = false
+    po.value = result.po
+    lines.value = result.lines
+    locations.value = result.locations
 }
 
-const processReceipt = async () => {
+const processReceiptAction = async () => {
     const itemsToReceive = lines.value.filter(l => l.qty_to_receive > 0)
     
     if (itemsToReceive.length === 0) {
@@ -101,81 +79,32 @@ const executeReceipt = async (itemsToReceive: any[]) => {
     processing.value = true
 
     try {
-        // 1. Create Receipt Header
         const receiptNum = `REC-${po.value.po_number}-${Date.now().toString().slice(-4)}`
-        const { data: receipt, error: rErr } = await supabase
-            .from('inventory_receipts')
-            .insert({
-                purchase_order_id: poId,
-                receipt_number: receiptNum,
-                received_at: new Date(),
-                notes: notes.value
-                // received_by: user_id (handled by RLS or trigger usually, or we can skip)
-            })
-            .select()
-            .single()
-
-        if (rErr) throw rErr
-
-        // 2. Create Receipt Lines & Update Inventory (Ideally this should be an RPC for safety)
-        // For now, we'll do it in a loop or batch. 
-        // Note: If you have an RPC 'process_receipt_items', use that. 
-        // I will assume we need to do it manually here or call a generic RPC.
         
-        // Let's try to use the client-side approach for now, but it's risky.
-        // Better: Insert receipt lines, then have a DB trigger update stock? 
-        // Or just do it manually.
+        const result = await processReceipt(
+            poId,
+            receiptNum,
+            itemsToReceive,
+            notes.value
+        )
 
-        const receiptLinesPayload = itemsToReceive.map(l => ({
-            receipt_id: receipt.id,
-            product_id: l.product_id,
-            location_id: l.location_id,
-            quantity_received: l.qty_to_receive
-        }))
-
-        const { error: rlErr } = await supabase.from('inventory_receipt_lines').insert(receiptLinesPayload)
-        if (rlErr) throw rlErr
-
-        // 3. Update PO Lines & Physical Stock
-        for (const item of itemsToReceive) {
-            if (!item.location_id) {
-                throw new Error(`No location selected for product ${item.sku}`);
-            }
-
-            // A. Update PO Line Received Qty
-            await supabase.rpc('increment_po_line_received', { 
-                p_line_id: item.po_line_id, 
-                p_qty: item.qty_to_receive 
-            })
-
-            // B. Update Physical Stock (Products table + Ledger)
-            const { error: stockErr } = await supabase.rpc('book_in_stock', {
-                p_product_id: item.product_id,
-                p_location_id: item.location_id,
-                p_quantity: item.qty_to_receive,
-                p_reference_id: receipt.id,
-                p_notes: `Receipt ${receiptNum} (PO: ${po.value.po_number})`,
-                p_idempotency_key: self.crypto.randomUUID()
-            })
-            
-            if (stockErr) throw stockErr
+        if (!result.success) {
+            processing.value = false
+            return
         }
 
-        // 4. Update PO Status
-        // Check if fully received
+        // Update PO Status
         const allFullyReceived = lines.value.every(l => {
-            const current = l.qty_to_receive // what we just added
+            const current = l.qty_to_receive
             const prev = l.qty_received_prev
             const total = current + prev
             return total >= l.qty_ordered
         })
         
         const newStatus = allFullyReceived ? 'received' : 'partial_received'
-        await supabase.from('purchase_orders').update({ status: newStatus }).eq('id', poId)
+        await updatePurchaseOrderStatus(poId, newStatus)
 
-        toast.add({ severity: 'success', summary: 'Success', detail: 'Receipt processed successfully.' })
-        router.push(`/receipts/${receipt.id}`)
-
+        router.push(`/receipts/${result.receiptId}`)
     } catch (error: any) {
         toast.add({ severity: 'error', summary: 'Error', detail: error.message })
     } finally {
@@ -197,7 +126,7 @@ onMounted(fetchData)
             </div>
             <div class="flex gap-2">
                 <Button label="Cancel" severity="secondary" outlined @click="router.back()" />
-                <Button label="Confirm Receipt" icon="pi pi-check" severity="success" @click="processReceipt" :loading="processing" />
+                <Button label="Confirm Receipt" icon="pi pi-check" severity="success" @click="processReceiptAction" :loading="processing" />
             </div>
         </div>
 

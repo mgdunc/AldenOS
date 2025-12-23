@@ -53,11 +53,11 @@ export function useSalesOrders() {
       }
 
       if (filters?.date_from) {
-        query = query.gte('order_date', filters.date_from)
+        query = query.gte('created_at', filters.date_from)
       }
 
       if (filters?.date_to) {
-        query = query.lte('order_date', filters.date_to)
+        query = query.lte('created_at', filters.date_to)
       }
 
       const { data, error } = await query
@@ -417,15 +417,245 @@ export function useSalesOrders() {
     }
   }
 
+  const loadOrderDetails = async (orderId: string) => {
+    loading.value = true
+
+    try {
+      // Fetch order, fulfillments, and lines in parallel
+      const [orderRes, fulfillRes, linesRes] = await Promise.all([
+        supabase
+          .from('sales_orders')
+          .select('*, billing_address, shipping_address')
+          .eq('id', orderId)
+          .single(),
+        supabase
+          .from('fulfillments')
+          .select('*')
+          .eq('sales_order_id', orderId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('sales_order_lines')
+          .select(`*, products (id, sku, name, list_price)`)
+          .eq('sales_order_id', orderId)
+          .order('created_at', { ascending: true })
+      ])
+
+      if (orderRes.error) throw orderRes.error
+
+      const rawLines = linesRes.data || []
+      const productIds = rawLines.map(l => l.product_id).filter(id => id)
+
+      // Fetch inventory availability and fulfillment quantities
+      let availMap: Record<string, number> = {}
+      let fulfillMap: Record<string, any> = {}
+      let incomingMap: Record<string, any[]> = {}
+
+      if (productIds.length > 0) {
+        const [stockData, fulfillQty, incoming] = await Promise.all([
+          supabase
+            .from('product_inventory_view')
+            .select('product_id, available')
+            .in('product_id', productIds),
+          supabase.rpc('get_line_fulfillment_qty', { p_order_id: orderId }),
+          supabase
+            .from('purchase_order_lines')
+            .select('product_id, quantity_ordered, purchase_orders!inner(po_number, expected_date, status)')
+            .in('product_id', productIds)
+            .eq('purchase_orders.status', 'placed')
+        ])
+
+        stockData.data?.forEach(row => {
+          availMap[row.product_id] = row.available
+        })
+
+        fulfillQty.data?.forEach((row: any) => {
+          fulfillMap[row.line_id] = row
+        })
+
+        incoming.data?.forEach((row: any) => {
+          if (!incomingMap[row.product_id]) incomingMap[row.product_id] = []
+          incomingMap[row.product_id]!.push({
+            po: row.purchase_orders.po_number,
+            date: row.purchase_orders.expected_date,
+            qty: row.quantity_ordered
+          })
+        })
+      }
+
+      // Map enriched line data
+      const enrichedLines = rawLines.map(l => ({
+        ...l,
+        available_now: availMap[l.product_id] ?? 0,
+        qty_allocated: l.quantity_allocated || 0,
+        qty_in_fulfillment: fulfillMap[l.id]?.qty_in_fulfillment ?? 0,
+        qty_shipped: fulfillMap[l.id]?.qty_shipped ?? 0,
+        line_total: l.quantity_ordered * l.unit_price
+      }))
+
+      return {
+        order: orderRes.data,
+        lines: enrichedLines,
+        fulfillments: fulfillRes.data || [],
+        incomingStock: incomingMap
+      }
+    } catch (error: any) {
+      console.error('Error loading order details:', error)
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load order details'
+      })
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const updateOrderLine = async (lineId: string, updates: Partial<SalesOrderLine>) => {
+    saving.value = true
+
+    try {
+      const { error } = await supabase
+        .from('sales_order_lines')
+        .update(updates)
+        .eq('id', lineId)
+
+      if (error) throw error
+
+      return true
+    } catch (error: any) {
+      console.error('Error updating line:', error)
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to update line item'
+      })
+      return false
+    } finally {
+      saving.value = false
+    }
+  }
+
+  const deleteOrderLine = async (lineId: string) => {
+    saving.value = true
+
+    try {
+      const { error } = await supabase
+        .from('sales_order_lines')
+        .delete()
+        .eq('id', lineId)
+
+      if (error) throw error
+
+      toast.add({
+        severity: 'success',
+        summary: 'Deleted',
+        detail: 'Line item deleted'
+      })
+
+      return true
+    } catch (error: any) {
+      console.error('Error deleting line:', error)
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to delete line item'
+      })
+      return false
+    } finally {
+      saving.value = false
+    }
+  }
+
+  const addProductToOrder = async (orderId: string, productId: string, unitPrice: number) => {
+    saving.value = true
+
+    try {
+      // Check if product already exists
+      const { data: existing } = await supabase
+        .from('sales_order_lines')
+        .select('*')
+        .eq('sales_order_id', orderId)
+        .eq('product_id', productId)
+        .maybeSingle()
+
+      if (existing) {
+        // Increment quantity
+        await supabase
+          .from('sales_order_lines')
+          .update({ quantity_ordered: existing.quantity_ordered + 1 })
+          .eq('id', existing.id)
+      } else {
+        // Insert new line
+        await supabase
+          .from('sales_order_lines')
+          .insert({
+            sales_order_id: orderId,
+            product_id: productId,
+            quantity_ordered: 1,
+            unit_price: unitPrice
+          })
+      }
+
+      return true
+    } catch (error: any) {
+      console.error('Error adding product:', error)
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to add product'
+      })
+      return false
+    } finally {
+      saving.value = false
+    }
+  }
+
+  const revertToDraft = async (orderId: string) => {
+    saving.value = true
+
+    try {
+      const { error } = await supabase
+        .from('sales_orders')
+        .update({ status: 'draft' })
+        .eq('id', orderId)
+
+      if (error) throw error
+
+      toast.add({
+        severity: 'success',
+        summary: 'Reverted',
+        detail: 'Order is now in Draft'
+      })
+
+      return true
+    } catch (error: any) {
+      console.error('Error reverting order:', error)
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: error.message
+      })
+      return false
+    } finally {
+      saving.value = false
+    }
+  }
+
   return {
     loading,
     saving,
     loadOrders,
     loadOrder,
+    loadOrderDetails,
     createOrder,
     updateOrder,
+    updateOrderLine,
+    deleteOrderLine,
+    addProductToOrder,
     confirmOrder,
     cancelOrder,
+    revertToDraft,
     createFulfillment,
     loadFulfillments,
     searchCustomers,

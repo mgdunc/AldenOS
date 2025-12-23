@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { supabase } from '@/lib/supabase'
+import { useInventory } from '../composables/useInventory'
 import { useToast } from 'primevue/usetoast'
 
 // Components
@@ -20,8 +20,8 @@ const props = defineProps<{
 const emit = defineEmits(['update:visible', 'saved'])
 
 const toast = useToast()
+const { adjustStock, saving, loadLocations } = useInventory()
 const locations = ref<any[]>([])
-const saving = ref(false)
 
 const form = ref({
     location_id: null as string | null,
@@ -31,8 +31,7 @@ const form = ref({
 
 // Fetch locations once when component loads
 onMounted(async () => {
-    const { data } = await supabase.from('locations').select('id, name').order('name')
-    locations.value = data || []
+    locations.value = await loadLocations()
 })
 
 // Helper: Calculate stock for the selected location
@@ -66,41 +65,20 @@ const onSave = async () => {
         }
     }
 
-    saving.value = true
+    const success = await adjustStock({
+        product_id: props.product.id,
+        location_id: form.value.location_id!,
+        quantity_change: form.value.quantity,
+        reason: form.value.reason,
+        notes: ''
+    })
 
-   // CALL THE RPC FUNCTION
-const { data, error } = await supabase.rpc('adjust_stock', {
-    p_product_id: props.product.id,
-    p_location_id: form.value.location_id,
-    p_quantity: form.value.quantity,
-    p_reason: form.value.reason
-});
-
-if (error) {
-    console.error(error);
-    // The error message from the database ("Insufficient stock...") appears here
-    toast.add({ severity: 'error', summary: 'Failed', detail: error.message });
-} else {
-    toast.add({ severity: 'success', summary: 'Updated', detail: 'Stock adjusted successfully.' });
-    emit('update:visible', false);
-    emit('saved');
-    form.value = { location_id: null, quantity: 0, reason: '' };
-}
-
-    if (error) {
-        console.error(error)
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to adjust stock.' })
-    } else {
-        toast.add({ severity: 'success', summary: 'Updated', detail: 'Stock adjusted successfully.' })
-        
-        // Close dialog and tell parent to reload
-        emit('update:visible', false)
-        emit('saved')
-        
+    if (success) {
         // Reset form
         form.value = { location_id: null, quantity: 0, reason: '' }
+        emit('saved')
+        emit('update:visible', false)
     }
-    saving.value = false
 }
 </script>
 

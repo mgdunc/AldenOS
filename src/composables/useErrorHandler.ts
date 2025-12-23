@@ -1,8 +1,10 @@
 import { useToast } from 'primevue/usetoast'
+import { supabase } from '@/lib/supabase'
 
 interface ErrorHandlerOptions {
   showToast?: boolean
   log?: boolean
+  logToDatabase?: boolean
   rethrow?: boolean
 }
 
@@ -21,6 +23,7 @@ export function useErrorHandler() {
     const {
       showToast = true,
       log = true,
+      logToDatabase = true,
       rethrow = false
     } = options
 
@@ -35,6 +38,13 @@ export function useErrorHandler() {
     // Log to console
     if (log) {
       console.error(`[Error${context ? ` in ${context}` : ''}]:`, error)
+    }
+
+    // Log to database
+    if (logToDatabase) {
+      logErrorToDatabase(context || 'Frontend Error', message, error).catch(err => {
+        console.error('Failed to log error to database:', err)
+      })
     }
 
     // Show toast notification
@@ -53,6 +63,47 @@ export function useErrorHandler() {
     }
 
     return { error, message }
+  }
+
+  /**
+   * Log error to system_logs table
+   */
+  const logErrorToDatabase = async (
+    source: string,
+    message: string,
+    error: any
+  ) => {
+    try {
+      const details: any = {
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      }
+
+      // Add error stack if available
+      if (error?.stack) {
+        details.stack = error.stack
+      }
+
+      // Add error object if it has additional properties
+      if (error && typeof error === 'object') {
+        details.errorObject = {
+          ...error,
+          message: error.message,
+          name: error.name
+        }
+      }
+
+      await supabase.from('system_logs').insert({
+        level: 'ERROR',
+        source,
+        message,
+        details
+      })
+    } catch (err) {
+      // Silently fail to avoid infinite error loops
+      console.error('Failed to write to system_logs:', err)
+    }
   }
 
   const handleAsyncError = async <T>(

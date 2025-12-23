@@ -4,6 +4,7 @@ import { formatCurrency } from '@/lib/formatCurrency'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
+import { useInventory } from '../composables/useInventory'
 
 // Custom Components
 import StockAdjustDialog from '@/modules/inventory/components/StockAdjustDialog.vue'
@@ -28,6 +29,8 @@ import { getStatusSeverity } from '@/lib/statusHelpers'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { loadSuppliers, updateProduct: updateProductComposable } = useInventory()
+const id = route.params.id as string
 
 const product = ref<any>(null)
 const suppliers = ref<any[]>([])
@@ -121,7 +124,7 @@ const loadData = async () => {
             .in('purchase_orders.status', ['placed', 'partial_received']) 
 
         // 6. Fetch Suppliers
-        const suppQuery = supabase.from('suppliers').select('id, name').order('name')
+        const suppQuery = loadSuppliers()
 
         // 7. Fetch Shopify Integrations (All)
         const shopifyQuery = supabase.from('integrations').select('id, settings').eq('provider', 'shopify')
@@ -163,7 +166,7 @@ const loadData = async () => {
             history.value = histRes.data || []
             allOrderLines.value = allocRes.data || []
             incomingStock.value = poRes.data || []
-            suppliers.value = suppRes.data || []
+            suppliers.value = suppRes || []
             
             shopifyIntegrations.value = shopifyRes.data || []
             productIntegrations.value = prodIntRes.data || []
@@ -189,27 +192,20 @@ const loadData = async () => {
 }
 
 const updateProduct = async () => {
-    saving.value = true
-    const { error } = await supabase.from('products').update({
+    const success = await updateProductComposable(id, {
         supplier_id: product.value.supplier_id,
         barcode: product.value.barcode,
-        carton_barcode: product.value.carton_barcode,
         description: product.value.description,
         list_price: product.value.list_price,
-        retail_price: product.value.retail_price,
         compare_at_price: product.value.compare_at_price,
         product_type: product.value.product_type,
         vendor: product.value.vendor,
         image_url: product.value.image_url
-    }).eq('id', product.value.id)
+    } as any)
 
-    if (error) {
-        toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-    } else {
-        toast.add({ severity: 'success', summary: 'Saved', detail: 'Product updated successfully' })
+    if (success) {
         editMode.value = false
     }
-    saving.value = false
 }
 
 const cancelEdit = () => {

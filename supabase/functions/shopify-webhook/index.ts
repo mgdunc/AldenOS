@@ -33,7 +33,7 @@ serve(async (req) => {
     }
 
     // Find the matching integration
-    const integration = integrations.find(i => {
+    const integration = integrations.find((i: any) => {
         const storedUrl = i.settings?.shop_url || ''
         // Normalize stored URL to compare with shopDomain
         const normalizedStored = storedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')

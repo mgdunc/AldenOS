@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "types": ["https://deno.land/x/edge@v1.3.5/types/mod.d.ts"]
+  }
+}

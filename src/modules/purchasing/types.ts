@@ -4,7 +4,6 @@ export interface PurchaseOrder {
   supplier_id: string
   supplier?: Supplier
   status: PurchaseOrderStatus
-  order_date: string
   expected_date?: string
   received_date?: string
   total_amount: number

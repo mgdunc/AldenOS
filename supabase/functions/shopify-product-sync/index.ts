@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 // Force deploy update: 2025-12-22b
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -6,7 +7,7 @@ import { ShopifyClient } from "../_shared/shopify.ts"
 
 console.log("Shopify Product Sync Function Started")
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -30,7 +31,7 @@ serve(async (req) => {
     page_info = body.page_info
     
     console.log(`[SYNC] Received request - jobId: ${jobId}, page_info: ${page_info ? 'present' : 'none'}`)
-  } catch (e) {
+  } catch (e: any) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), { 
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -99,7 +100,7 @@ serve(async (req) => {
             }).eq('id', jobId)
             }
             await log(`Found ${count} products to sync.`, "info")
-        } catch (e) {
+        } catch (e: any) {
             await log(`Failed to get product count: ${e.message}`, "warning")
         }
       }

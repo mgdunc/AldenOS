@@ -42,7 +42,7 @@ describe('useInventory', () => {
 
       expect(supabase.from).toHaveBeenCalledWith('products')
       expect(result).toHaveLength(1)
-      expect(result[0].sku).toBe('TEST-001')
+      expect(result[0]?.sku).toBe('TEST-001')
     })
 
     it('should handle errors gracefully', async () => {
@@ -144,8 +144,8 @@ describe('useInventoryStore', () => {
 
     expect(store.stats.total_products).toBe(3)
     expect(store.stats.active_products).toBe(2)
-    expect(store.stats.out_of_stock_count).toBe(1)
-    expect(store.stats.total_value).toBe(65) // (10*5) + (0*10) + (5*3)
+    expect(store.stats.out_of_stock_products).toBe(1)
+    expect(store.stats.total_inventory_value).toBe(65) // (10*5) + (0*10) + (5*3)
   })
 
   it('should filter products by search', () => {
@@ -159,7 +159,7 @@ describe('useInventoryStore', () => {
     store.setFilters({ search: 'test' })
 
     expect(store.filteredProducts).toHaveLength(1)
-    expect(store.filteredProducts[0].sku).toBe('TEST-001')
+    expect(store.filteredProducts[0]?.sku).toBe('TEST-001')
   })
 
   it('should add product', () => {
@@ -180,7 +180,7 @@ describe('useInventoryStore', () => {
 
     store.updateProduct('1', { name: 'New Name' })
 
-    expect(store.products[0].name).toBe('New Name')
+    expect(store.products[0]?.name).toBe('New Name')
   })
 
   it('should remove product', () => {
@@ -193,6 +193,6 @@ describe('useInventoryStore', () => {
     store.removeProduct('1')
 
     expect(store.products).toHaveLength(1)
-    expect(store.products[0].id).toBe('2')
+    expect(store.products[0]?.id).toBe('2')
   })
 })

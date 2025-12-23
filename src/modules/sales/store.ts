@@ -18,14 +18,14 @@ export const useSalesStore = defineStore('sales', () => {
   const stats = computed<SalesStats>(() => {
     return {
       total_orders: orders.value.length,
-      draft_count: orders.value.filter(o => o.status === 'draft').length,
-      confirmed_count: orders.value.filter(o => o.status === 'confirmed').length,
-      fulfilled_count: orders.value.filter(o => o.status === 'fulfilled').length,
-      cancelled_count: orders.value.filter(o => o.status === 'cancelled').length,
+      draft_orders: orders.value.filter(o => o.status === 'draft').length,
+      confirmed_orders: orders.value.filter(o => o.status === 'confirmed').length,
+      fulfilled_orders: orders.value.filter(o => o.status === 'fulfilled').length,
+      cancelled_orders: orders.value.filter(o => o.status === 'cancelled').length,
       total_revenue: orders.value
         .filter(o => ['confirmed', 'fulfilled', 'shipped', 'delivered'].includes(o.status))
-        .reduce((sum, o) => sum + (o.total || 0), 0),
-      pending_fulfillment: orders.value.filter(o => 
+        .reduce((sum, o) => sum + (o.total_amount || 0), 0),
+      pending_fulfillments: orders.value.filter(o => 
         o.status === 'confirmed' && 
         (o.fulfillment_status === 'not_started' || o.fulfillment_status === 'partially_fulfilled')
       ).length
@@ -56,11 +56,11 @@ export const useSalesStore = defineStore('sales', () => {
     }
 
     if (filters.value.date_from) {
-      result = result.filter(o => o.order_date >= filters.value.date_from!)
+      result = result.filter(o => o.created_at >= filters.value.date_from!)
     }
 
     if (filters.value.date_to) {
-      result = result.filter(o => o.order_date <= filters.value.date_to!)
+      result = result.filter(o => o.created_at <= filters.value.date_to!)
     }
 
     return result

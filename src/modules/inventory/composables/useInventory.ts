@@ -261,6 +261,51 @@ export function useInventory() {
     }
   }
 
+  const loadLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .order('name')
+
+      if (error) throw error
+
+      return data || []
+    } catch (error: any) {
+      console.error('Error loading locations:', error)
+      return []
+    }
+  }
+
+  const loadSuppliers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name')
+        .order('name')
+
+      if (error) throw error
+
+      return data || []
+    } catch (error: any) {
+      console.error('Error loading suppliers:', error)
+      return []
+    }
+  }
+
+  const getProductStats = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_product_stats')
+
+      if (error) throw error
+
+      return data
+    } catch (error: any) {
+      console.error('Error loading product stats:', error)
+      return null
+    }
+  }
+
   return {
     loading,
     saving,
@@ -270,6 +315,9 @@ export function useInventory() {
     updateProduct,
     deleteProduct,
     adjustStock,
-    searchProducts
+    searchProducts,
+    loadLocations,
+    loadSuppliers,
+    getProductStats
   }
 }

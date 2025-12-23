@@ -3,6 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSalesOrders } from '../composables/useSalesOrders'
 import { useSalesStore } from '../store'
+import { useResponsive } from '@/composables/useResponsive'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 // Helpers
 import { formatDate } from '@/lib/formatDate'
@@ -21,6 +23,8 @@ import Badge from 'primevue/badge'
 const router = useRouter()
 const store = useSalesStore()
 const { loading, saving, loadOrders, createOrder } = useSalesOrders()
+const { isMobile, isTablet } = useResponsive()
+const { handleError, handleSuccess } = useErrorHandler()
 
 const expandedRows = ref([])
 const activeTab = ref('all')
@@ -180,6 +184,8 @@ onMounted(fetchOrders)
                 selectionMode="single" 
                 dataKey="id"
                 @rowSelect="(e: any) => router.push(`/sales/${e.data.id}`)"
+                :scrollable="!isMobile"
+                responsiveLayout="scroll"
             >
                 <template #empty><div class="p-4 text-center">No sales orders found for this filter.</div></template>
 

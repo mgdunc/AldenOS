@@ -54,11 +54,11 @@ export const usePurchasingStore = defineStore('purchasing', () => {
     }
 
     if (filters.value.date_from) {
-      result = result.filter(po => po.order_date >= filters.value.date_from!)
+      result = result.filter(po => po.expected_date && po.expected_date >= filters.value.date_from!)
     }
 
     if (filters.value.date_to) {
-      result = result.filter(po => po.order_date <= filters.value.date_to!)
+      result = result.filter(po => po.expected_date && po.expected_date <= filters.value.date_to!)
     }
 
     return result

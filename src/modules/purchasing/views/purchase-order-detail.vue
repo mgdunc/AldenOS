@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { formatCurrency } from '@/lib/formatCurrency'
+import { useResponsive } from '@/composables/useResponsive'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 import { usePurchaseOrder } from '@/modules/purchasing/composables/usePurchaseOrder'
 import AddProductDialog from '@/modules/inventory/components/AddProductDialog.vue'
 import ProductDemandDialog from '@/modules/inventory/components/ProductDemandDialog.vue'
@@ -54,6 +56,8 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
+const { isMobile, isTablet } = useResponsive()
+const { handleError } = useErrorHandler()
 const poId = props.id || (route.params.id as string)
 
 // Use Composable
@@ -103,15 +107,10 @@ const handleUpdateStatus = (status: string) => {
 }
 
 /**
- * Wraps the receive all action with a confirmation dialog.
+ * Creates a new receipt for this purchase order
  */
-const handleReceiveAll = () => {
-    confirm.require({
-        message: 'Receive ALL items into default location?',
-        header: 'Receive All',
-        icon: 'pi pi-box',
-        accept: () => receiveAll()
-    })
+const createReceipt = () => {
+    router.push(`/receipts/create?po_id=${poId}`)
 }
 
 /**
@@ -180,7 +179,7 @@ onMounted(fetchData)
                     <Button v-if="po.status !== 'cancelled' && isDraft" label="Cancel" severity="danger" outlined icon="pi pi-times" @click="handleUpdateStatus('cancelled')" :loading="processing" />
                     <Button v-if="isDraft" label="Place Order" icon="pi pi-check" @click="handleUpdateStatus('placed')" :disabled="lines.length === 0" :loading="processing" />
                     <Button v-if="po.status === 'placed'" label="Revert to Draft" icon="pi pi-undo" severity="warning" outlined @click="handleUpdateStatus('draft')" :loading="processing" />
-                    <Button v-if="isPlaced" label="Receive" icon="pi pi-box" severity="success" @click="handleReceiveAll" :loading="processing" />
+                    <Button v-if="isPlaced" label="Create Receipt" icon="pi pi-box" severity="success" @click="createReceipt" />
                 </div>
             </div>
 
@@ -230,8 +229,15 @@ onMounted(fetchData)
                     <div class="flex justify-content-end mb-3">
                         <Button label="Add Product" icon="pi pi-plus" size="small" @click="showAddDialog = true" :disabled="!isDraft" class="print:hidden" />
                     </div>
-                    <DataTable :value="lines" stripedRows class="print:w-full" showGridlines>
-                <Column field="products.sku" header="SKU" style="width: 10rem">
+                    <DataTable 
+                        :value="lines" 
+                        stripedRows 
+                        class="print:w-full" 
+                        showGridlines
+                        :scrollable="!isMobile"
+                        responsiveLayout="scroll"
+                    >
+                <Column v-if="!isMobile" field="products.sku" header="SKU" style="width: 10rem">
                     <template #body="{ data }">
                         <router-link :to="`/product/${data.products.id}`" class="text-primary font-bold no-underline hover:underline">
                             {{ data.products.sku }}

@@ -3,6 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePurchaseOrders } from '../composables/usePurchaseOrders'
 import { usePurchasingStore } from '../store'
+import { useResponsive } from '@/composables/useResponsive'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 // Import Helpers
 import { formatDate } from '@/lib/formatDate'
@@ -21,6 +23,8 @@ import Badge from 'primevue/badge'
 const router = useRouter()
 const store = usePurchasingStore()
 const { loading, saving, loadPurchaseOrders, createPurchaseOrder } = usePurchaseOrders()
+const { isMobile, isTablet } = useResponsive()
+const { handleError } = useErrorHandler()
 
 const expandedRows = ref([])
 const activeTab = ref('all')
@@ -83,7 +87,7 @@ const fetchOrders = async () => {
 
 const createDraftOrder = async () => {
     const po = await createPurchaseOrder(
-        { status: 'draft', order_date: new Date().toISOString().split('T')[0] },
+        { status: 'draft' },
         []
     )
     
@@ -176,6 +180,8 @@ onMounted(fetchOrders)
                 selectionMode="single" 
                 dataKey="id"
                 @rowSelect="(e: any) => router.push(`/purchases/${e.data.id}`)"
+                :scrollable="!isMobile"
+                responsiveLayout="scroll"
             >
                 <template #empty>No purchase orders found.</template>
 

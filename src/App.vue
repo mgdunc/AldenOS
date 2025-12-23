@@ -10,6 +10,7 @@ import Button from 'primevue/button'
 import Avatar from 'primevue/avatar'
 import Drawer from 'primevue/drawer' // For mobile sidebar
 import ErrorView from '@/modules/core/views/ErrorView.vue'
+import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 
 const router = useRouter()
@@ -38,6 +39,20 @@ onMounted(() => {
             authStore.loading = false
         }
     }, 5000)
+
+    // Global search keyboard shortcut (Cmd+K or Ctrl+K)
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault()
+            searchVisible.value = true
+        }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    
+    // Cleanup
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown)
+    }
 })
 
 const handleSignOut = async () => {
@@ -155,12 +170,20 @@ const items = ref([
             
             <!-- Topbar: Slightly darker (gray-100) -->
             <div v-if="authStore.isAuthenticated" class="h-5rem bg-gray-100 border-bottom-1 surface-border flex align-items-center justify-content-between px-4 shadow-1 z-2">
-                <div class="flex align-items-center gap-2">
+                <div class="flex align-items-center gap-2 flex-1">
                     <Button icon="pi pi-bars" text class="md:hidden" @click="mobileMenuVisible = true" />
-                    <span class="text-lg font-medium text-700">Warehouse Management</span>
+                    <div class="flex-1 max-w-30rem">
+                        <span 
+                            class="flex align-items-center gap-2 px-4 py-2 border-round surface-card cursor-pointer hover:surface-hover transition-colors transition-duration-150"
+                            @click="searchVisible = true"
+                        >
+                            <i class="pi pi-search text-500"></i>
+                            <span class="text-500">Search products, orders...</span>
+                            <kbd class="ml-auto text-xs text-400 border-1 surface-border px-2 py-1 border-round">⌘K</kbd>
+                        </span>
+                    </div>
                 </div>
                 <div class="flex gap-2">
-                     <Button icon="pi pi-search" label="Search" text @click="searchVisible = true" />
                      <Button icon="pi pi-bell" text rounded severity="secondary" />
                      <Button icon="pi pi-cog" text rounded severity="secondary" />
                 </div>
@@ -168,7 +191,9 @@ const items = ref([
 
             <div class="flex-1 overflow-y-auto p-4" style="font-size: 0.925rem">
                 <ErrorView v-if="globalError" :error="globalError" :reset="resetError" />
-                <RouterView v-else />
+                <ErrorBoundary v-else>
+                    <RouterView />
+                </ErrorBoundary>
             </div>
         </div>
     </div>

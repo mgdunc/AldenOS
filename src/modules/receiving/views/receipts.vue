@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { supabase } from '@/lib/supabase'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useReceiving } from '../composables/useReceiving'
+import { useReceivingStore } from '../store'
+import { useResponsive } from '@/composables/useResponsive'
+import { useErrorHandler } from '@/composables/useErrorHandler'
+import { storeToRefs } from 'pinia'
 import { formatDate } from '@/lib/formatDate'
 import { FilterMatchMode } from '@primevue/core/api'
 
@@ -16,50 +20,25 @@ import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 
 const router = useRouter()
-const receipts = ref<any[]>([])
+const { loadReceipts, loadReceivablePurchaseOrders } = useReceiving()
+const store = useReceivingStore()
+const { receipts, loading, stats } = storeToRefs(store)
+const { isMobile, isTablet } = useResponsive()
+const { handleError } = useErrorHandler()
+
 const receivablePOs = ref<any[]>([])
-const loading = ref(true)
 const showNewReceiptDialog = ref(false)
 const loadingPOs = ref(false)
 const filters = ref({ global: { value: null, matchMode: FilterMatchMode.CONTAINS } })
 
-const kpis = computed(() => {
-    const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    
-    return {
-        total: receipts.value.length,
-        thisMonth: receipts.value.filter(r => new Date(r.received_at) >= startOfMonth).length
-    }
-})
-
 const fetchReceipts = async () => {
-    loading.value = true
-    const { data, error } = await supabase
-        .from('inventory_receipts')
-        .select(`
-            id, 
-            receipt_number, 
-            received_at, 
-            notes,
-            purchase_orders (po_number, supplier_name)
-        `)
-        .order('received_at', { ascending: false })
-    
-    if (!error) receipts.value = data
-    loading.value = false
+    await loadReceipts()
 }
 
 const openNewReceiptDialog = async () => {
     showNewReceiptDialog.value = true
     loadingPOs.value = true
-    const { data } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .in('status', ['placed', 'partial', 'partial_received'])
-        .order('expected_date', { ascending: true })
-    
-    receivablePOs.value = data || []
+    receivablePOs.value = await loadReceivablePurchaseOrders()
     loadingPOs.value = false
 }
 
@@ -75,7 +54,7 @@ onMounted(fetchReceipts)
                 <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full border-left-3 border-primary">
                     <div>
                         <span class="block text-500 font-medium mb-2">Total Receipts</span>
-                        <div class="text-900 font-bold text-3xl">{{ kpis.total }}</div>
+                        <div class="text-900 font-bold text-3xl">{{ stats.total_receipts }}</div>
                     </div>
                     <div class="flex align-items-center justify-content-center bg-blue-100 border-round" style="width:3rem;height:3rem">
                         <i class="pi pi-history text-blue-500 text-xl"></i>
@@ -86,7 +65,7 @@ onMounted(fetchReceipts)
                 <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full border-left-3 border-green-500">
                     <div>
                         <span class="block text-500 font-medium mb-2">Received This Month</span>
-                        <div class="text-900 font-bold text-3xl">{{ kpis.thisMonth }}</div>
+                        <div class="text-900 font-bold text-3xl">{{ stats.this_month }}</div>
                     </div>
                     <div class="flex align-items-center justify-content-center bg-green-100 border-round" style="width:3rem;height:3rem">
                         <i class="pi pi-calendar text-green-500 text-xl"></i>
@@ -124,6 +103,8 @@ onMounted(fetchReceipts)
                 selectionMode="single" 
                 @row-select="(e) => router.push(`/receipts/${e.data.id}`)"
                 class="p-datatable-sm"
+                :scrollable="!isMobile"
+                responsiveLayout="scroll"
             >
                 <template #empty><div class="p-5 text-center text-500">No receipts found.</div></template>
 

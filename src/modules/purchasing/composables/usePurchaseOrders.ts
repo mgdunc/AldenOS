@@ -47,11 +47,11 @@ export function usePurchaseOrders() {
       }
 
       if (filters?.date_from) {
-        query = query.gte('order_date', filters.date_from)
+        query = query.gte('expected_date', filters.date_from)
       }
 
       if (filters?.date_to) {
-        query = query.lte('order_date', filters.date_to)
+        query = query.lte('expected_date', filters.date_to)
       }
 
       const { data, error } = await query
@@ -110,10 +110,16 @@ export function usePurchaseOrders() {
     saving.value = true
 
     try {
+      // Ensure supplier_name is provided (required by DB)
+      const dataToInsert: any = {
+        ...poData,
+        supplier_name: (poData as any).supplier_name || 'TBD'
+      }
+
       // Create PO
       const { data: po, error: poError } = await supabase
         .from('purchase_orders')
-        .insert(poData)
+        .insert(dataToInsert)
         .select()
         .single()
 

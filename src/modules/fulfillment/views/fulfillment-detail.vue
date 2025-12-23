@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { supabase } from '@/lib/supabase'
-import { useToast } from 'primevue/usetoast'
+import { useFulfillment } from '../composables/useFulfillment'
 import { useConfirm } from 'primevue/useconfirm'
+import type { FulfillmentWithRelations, FulfillmentLineWithRelations } from '../types'
 
 // PrimeVue
 import Button from 'primevue/button'
@@ -15,13 +15,20 @@ import Timeline from 'primevue/timeline'
 
 const route = useRoute()
 const router = useRouter()
-const toast = useToast()
 const confirm = useConfirm()
+const { 
+    loadFulfillmentById, 
+    updateFulfillmentStatus, 
+    shipFulfillment: shipFulfillmentRpc,
+    cancelFulfillment: cancelFulfillmentRpc,
+    revertShipment: revertShipmentRpc,
+    loading,
+    saving
+} = useFulfillment()
 
 const id = route.params.id as string
-const fulfillment = ref<any>(null)
-const lines = ref<any[]>([])
-const loading = ref(true)
+const fulfillment = ref<FulfillmentWithRelations | null>(null)
+const lines = ref<FulfillmentLineWithRelations[]>([])
 const processing = ref(false)
 
 // Timeline events for visual progress
@@ -33,28 +40,15 @@ const events = ref([
 ]);
 
 const loadData = async () => {
-    loading.value = true
-    // 1. Fetch Header
-    const { data: header, error: headErr } = await supabase
-        .from('fulfillments')
-        .select('*, sales_orders(order_number)')
-        .eq('id', id)
-        .single()
+    const result = await loadFulfillmentById(id)
     
-    // 2. Fetch Lines (Linked to Products)
-    const { data: items, error: lineErr } = await supabase
-        .from('fulfillment_lines')
-        .select('*, sales_order_lines(products(sku, name)), locations(name)')
-        .eq('fulfillment_id', id)
-
-    if (headErr || lineErr) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load fulfillment.' })
+    if (!result.fulfillment) {
         router.push('/fulfillments')
-    } else {
-        fulfillment.value = header
-        lines.value = items || []
+        return
     }
-    loading.value = false
+    
+    fulfillment.value = result.fulfillment
+    lines.value = result.lines
 }
 
 // --- WORKFLOW ACTIONS ---
@@ -62,26 +56,20 @@ const loadData = async () => {
 // 1. Start Picking
 const markAsPicking = async () => {
     processing.value = true
-    await supabase.from('fulfillments').update({ status: 'picking' }).eq('id', id)
-    await loadData()
+    const success = await updateFulfillmentStatus(id, 'picking')
+    if (success) await loadData()
     processing.value = false
 }
 
 // 2. Mark Packed (Items are in the box)
 const markAsPacked = async () => {
     processing.value = true
-    const { error } = await supabase.from('fulfillments').update({ status: 'packed' }).eq('id', id)
-    
-    if (error) {
-        console.error(error)
-        toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-    } else {
-        await loadData()
-    }
+    const success = await updateFulfillmentStatus(id, 'packed')
+    if (success) await loadData()
     processing.value = false
 }
 
-// 3. SHIP IT (Calls the SQL Function we wrote)
+// 3. SHIP IT (Calls the SQL Function)
 const shipFulfillment = () => {
     confirm.require({
         message: 'This will deduct inventory and finalize the shipment. Continue?',
@@ -89,18 +77,8 @@ const shipFulfillment = () => {
         icon: 'pi pi-exclamation-triangle',
         accept: async () => {
             processing.value = true
-            const { error } = await supabase.rpc('process_fulfillment_shipment', { 
-                p_fulfillment_id: id,
-                p_idempotency_key: self.crypto.randomUUID()
-            })
-
-            if (error) {
-                console.error(error)
-                toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-            } else {
-                toast.add({ severity: 'success', summary: 'Shipped!', detail: 'Inventory deducted successfully.' })
-                await loadData()
-            }
+            const success = await shipFulfillmentRpc(id)
+            if (success) await loadData()
             processing.value = false
         }
     })
@@ -115,18 +93,8 @@ const cancelFulfillment = () => {
         acceptClass: 'p-button-danger',
         accept: async () => {
             processing.value = true
-            const { error } = await supabase.rpc('cancel_fulfillment_and_return_stock', {
-                p_fulfillment_id: id,
-                p_idempotency_key: self.crypto.randomUUID()
-            })
-
-            if (error) {
-                console.error(error)
-                toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-            } else {
-                toast.add({ severity: 'success', summary: 'Cancelled', detail: 'Fulfillment cancelled and stock returned.' })
-                await loadData()
-            }
+            const success = await cancelFulfillmentRpc(id)
+            if (success) await loadData()
             processing.value = false
         }
     })
@@ -141,18 +109,8 @@ const unshipFulfillment = () => {
         acceptClass: 'p-button-danger',
         accept: async () => {
             processing.value = true
-            const { error } = await supabase.rpc('revert_fulfillment_shipment', {
-                p_fulfillment_id: id,
-                p_idempotency_key: self.crypto.randomUUID()
-            })
-
-            if (error) {
-                console.error(error)
-                toast.add({ severity: 'error', summary: 'Error', detail: error.message })
-            } else {
-                toast.add({ severity: 'success', summary: 'Cancelled', detail: 'Shipment cancelled and stock returned.' })
-                await loadData()
-            }
+            const success = await revertShipmentRpc(id)
+            if (success) await loadData()
             processing.value = false
         }
     })
