@@ -157,6 +157,26 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
     liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Starting ${jobType} for integration ${integrationId}...`)
 
     try {
+      // Create a queue entry
+      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Adding sync to queue...`)
+      
+      const { data: queueEntry, error: queueError } = await supabase
+        .from('sync_queue')
+        .insert({
+          integration_id: integrationId,
+          sync_type: jobType,
+          status: 'pending',
+          priority: 3
+        })
+        .select()
+        .single()
+
+      if (queueError) {
+        throw new Error(`Failed to create queue entry: ${queueError.message}`)
+      }
+
+      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Queue entry created. Processing sync...`)
+
       // Determine the Edge Function to call
       const functionName = jobType === 'product_sync' 
         ? 'shopify-product-sync' 
@@ -185,7 +205,8 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
           body: { 
             integrationId: integrationId,
             page_info: nextPageInfo,
-            jobId: currentJobId
+            jobId: currentJobId,
+            queueId: queueEntry.id
           }
         })
 

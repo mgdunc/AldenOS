@@ -22,6 +22,7 @@ serve(async (req: Request) => {
   let jobId: string | undefined
   let integrationId: string | undefined
   let page_info: string | undefined
+  let queueId: string | undefined
 
   try {
     const body = await req.json().catch(() => ({}))
@@ -29,8 +30,9 @@ serve(async (req: Request) => {
     jobId = body.jobId
     integrationId = body.integrationId
     page_info = body.page_info
+    queueId = body.queueId
     
-    console.log(`[SYNC] Received request - integrationId: ${integrationId}, jobId: ${jobId}, page_info: ${page_info ? 'present' : 'none'}`)
+    console.log(`[SYNC] Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
     console.log(`[SYNC] Full body:`, JSON.stringify(body))
   } catch (e: any) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), { 
@@ -89,7 +91,8 @@ serve(async (req: Request) => {
             job_type: 'product_sync',
             status: 'pending',
             total_items: 0,
-            processed_items: 0
+            processed_items: 0,
+            queue_id: queueId || null
           })
           .select()
           .single()
@@ -307,6 +310,15 @@ serve(async (req: Request) => {
               completed_at: new Date().toISOString()
             }).eq('id', jobId)
           }
+          
+          // Mark queue item as completed if queueId provided
+          if (queueId) {
+            await supabase.from('sync_queue').update({
+              status: 'completed',
+              completed_at: new Date().toISOString()
+            }).eq('id', queueId)
+          }
+          
           await log(`Sync Complete.`, "success")
           return { success: true, nextPageInfo: null, jobId, message: "Sync Complete" }
       }
@@ -331,6 +343,16 @@ serve(async (req: Request) => {
               details: { sync_id, jobId, error: error.message, stack: error.stack }
            })
       }
+      
+      // Mark queue item as failed if queueId provided
+      if (queueId) {
+        await supabase.from('sync_queue').update({
+          status: 'failed',
+          error_message: error.message,
+          completed_at: new Date().toISOString()
+        }).eq('id', queueId)
+      }
+      
       return { success: false, error: error.message }
     }
   }
