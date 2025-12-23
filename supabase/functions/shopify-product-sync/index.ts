@@ -30,12 +30,25 @@ serve(async (req: Request) => {
     integrationId = body.integrationId
     page_info = body.page_info
     
-    console.log(`[SYNC] Received request - jobId: ${jobId}, page_info: ${page_info ? 'present' : 'none'}`)
+    console.log(`[SYNC] Received request - integrationId: ${integrationId}, jobId: ${jobId}, page_info: ${page_info ? 'present' : 'none'}`)
+    console.log(`[SYNC] Full body:`, JSON.stringify(body))
   } catch (e: any) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), { 
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     })
+  }
+
+  // Validate integrationId before starting background task
+  if (!integrationId) {
+    console.error('[SYNC] ERROR: integrationId is missing from request')
+    return new Response(
+      JSON.stringify({ error: "Integration ID is required" }),
+      { 
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    )
   }
 
   // Define the background task
