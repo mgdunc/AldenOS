@@ -127,7 +127,7 @@ const loadData = async () => {
         const suppQuery = loadSuppliers()
 
         // 7. Fetch Shopify Integrations (All)
-        const shopifyQuery = supabase.from('integrations').select('id, settings').eq('provider', 'shopify')
+        const shopifyQuery = supabase.from('integrations').select('id, name, settings').eq('provider', 'shopify')
 
         // 8. Fetch Product Integrations
         const productIntegrationsQuery = supabase.from('product_integrations').select('*').eq('product_id', id)
