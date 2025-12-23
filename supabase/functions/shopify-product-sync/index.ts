@@ -146,7 +146,6 @@ serve(async (req: Request) => {
         // Process Batch
         const unmatchedBatch: any[] = []
         const integrationUpserts: any[] = []
-        const productUpdates: Promise<any>[] = []
 
         // 1. Collect all SKUs in this batch
         const skusInBatch = new Set<string>()
@@ -167,6 +166,9 @@ serve(async (req: Request) => {
             existingProducts.forEach((p: any) => productMap.set(p.sku, p))
         }
 
+        // Track matched variant IDs for batch deletion of unmatched records
+        const matchedVariantIds: string[] = []
+
         // 3. Process products using the map
         for (const sp of products) {
           for (const variant of sp.variants) {
@@ -176,14 +178,6 @@ serve(async (req: Request) => {
 
             if (existingProduct) {
               matchedCount++
-              
-              // Update image if missing
-              if (!existingProduct.image_url && (sp.image?.src || sp.images?.[0]?.src)) {
-                  const imageUrl = sp.image?.src || sp.images?.[0]?.src
-                  productUpdates.push(
-                      supabase.from('products').update({ image_url: imageUrl }).eq('id', existingProduct.id)
-                  )
-              }
 
               // Prepare integration link
               integrationUpserts.push({
@@ -195,13 +189,8 @@ serve(async (req: Request) => {
 
               updatedCount++
               
-              // Remove from unmatched if it was there previously
-              // This is a "soft delete" - we'll delete any existing unmatched record for this variant
-              await supabase
-                .from('integration_unmatched_products')
-                .delete()
-                .eq('integration_id', integration.id)
-                .eq('external_variant_id', variant.id.toString())
+              // Track this variant to remove from unmatched later
+              matchedVariantIds.push(variant.id.toString())
                 
             } else {
                 // Add to unmatched batch
@@ -228,6 +217,16 @@ serve(async (req: Request) => {
         }
 
         // 4. Execute Bulk Operations
+        // First, batch delete matched variants from unmatched table
+        if (matchedVariantIds.length > 0) {
+            console.log(`[SYNC] Removing ${matchedVariantIds.length} newly matched products from unmatched table`)
+            await supabase
+                .from('integration_unmatched_products')
+                .delete()
+                .eq('integration_id', integration.id)
+                .in('external_variant_id', matchedVariantIds)
+        }
+
         if (integrationUpserts.length > 0) {
             console.log(`[SYNC] Upserting ${integrationUpserts.length} product integration links`)
             const { error: linkError } = await supabase
@@ -256,12 +255,6 @@ serve(async (req: Request) => {
             }
         }
 
-        if (productUpdates.length > 0) {
-            console.log(`[SYNC] Updating ${productUpdates.length} product images`)
-            await Promise.all(productUpdates)
-            await log(`Updated ${productUpdates.length} product images`, "info")
-        }
-
         await log(`Batch summary: ${matchedCount} matched, ${unmatchedBatch.length} unmatched`, "info")
 
         // Update Progress (Incrementally)
@@ -279,33 +272,9 @@ serve(async (req: Request) => {
 
       // 5. Check for Next Page
       if (nextPageInfo) {
-          console.log(`[SYNC] More pages available, triggering next batch`)
-          await log(`Batch complete. Processed ${processedCount}. Starting next batch...`, "info")
-          
-          try {
-            console.log(`[SYNC] Invoking next batch via supabase.functions.invoke`)
-            
-            const { error: invokeError } = await supabase.functions.invoke('shopify-product-sync', {
-                body: {
-                    sync_id,
-                    jobId,
-                    integrationId,
-                    page_info: nextPageInfo
-                }
-            })
-            
-            if (invokeError) {
-                console.error(`[SYNC] Failed to trigger next batch:`, invokeError)
-                await log(`Failed to trigger next batch: ${invokeError.message || invokeError}. Sync incomplete.`, "warning")
-            } else {
-                console.log(`[SYNC] Successfully triggered next batch`)
-                await log(`Triggered next batch successfully.`, "info")
-            }
-          } catch (e: any) {
-             console.error("[SYNC] Failed to trigger next batch (exception)", e)
-             await log(`Error triggering next batch: ${e.message}. Sync incomplete.`, "warning")
-          }
-
+          console.log(`[SYNC] More pages available. Returning nextPageInfo to client.`)
+          await log(`Batch complete. Processed ${processedCount}. Returning next page info to client...`, "info")
+          return { success: true, nextPageInfo, jobId, message: `Processed ${processedCount} items. More pages available.` }
       } else {
           // No more pages - Complete!
           console.log(`[SYNC] No more pages, marking job as completed`)
@@ -316,6 +285,7 @@ serve(async (req: Request) => {
             }).eq('id', jobId)
           }
           await log(`Sync Complete.`, "success")
+          return { success: true, nextPageInfo: null, jobId, message: "Sync Complete" }
       }
 
     } catch (error: any) {
@@ -338,16 +308,16 @@ serve(async (req: Request) => {
               details: { sync_id, jobId, error: error.message, stack: error.stack }
            })
       }
+      return { success: false, error: error.message }
     }
   }
 
-  // Start the background task
-  // @ts-ignore
-  EdgeRuntime.waitUntil(runSync())
+  // Execute Sync Synchronously
+  const result = await runSync()
 
-  // Return immediately
+  // Return result to client
   return new Response(
-    JSON.stringify({ message: "Sync started in background" }),
+    JSON.stringify(result),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   )
 })

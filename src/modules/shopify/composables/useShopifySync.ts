@@ -150,6 +150,8 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
   }
 
   const startSync = async () => {
+    if (syncing.value) return
+
     syncing.value = true
     liveLogs.value = []
     liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Starting ${jobType} for integration ${integrationId}...`)
@@ -160,30 +162,48 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
         ? 'shopify-product-sync' 
         : 'shopify-order-sync'
 
-      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Invoking Edge Function: ${functionName}`)
+      let nextPageInfo: string | undefined = undefined
+      let currentJobId: string | undefined = undefined
+      let pageCount = 1
+      let hasMore = true
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: { integrationId: integrationId }
-      })
+      while (hasMore && syncing.value) {
+        liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Syncing page ${pageCount}...`)
 
-      if (error) {
-        liveLogs.value.push(`[${new Date().toLocaleTimeString()}] ERROR: ${error.message}`)
-        throw error
+        const { data, error } = await supabase.functions.invoke(functionName, {
+          body: { 
+            integrationId: integrationId,
+            page_info: nextPageInfo,
+            jobId: currentJobId
+          }
+        })
+
+        if (error) {
+          throw error
+        }
+
+        if (data?.error) {
+          throw new Error(data.error)
+        }
+
+        // Update state for next iteration
+        nextPageInfo = data.nextPageInfo
+        currentJobId = data.jobId
+        
+        liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Page ${pageCount} complete. ${data.message || ''}`)
+        
+        if (!nextPageInfo) {
+          hasMore = false
+          liveLogs.value.push(`[${new Date().toLocaleTimeString()}] All pages synced successfully.`)
+        } else {
+          pageCount++
+        }
       }
 
-      if (data?.error) {
-        liveLogs.value.push(`[${new Date().toLocaleTimeString()}] ERROR: ${data.error}`)
-        throw new Error(data.error)
+      if (!syncing.value) {
+         liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Sync cancelled by user.`)
       }
 
-      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Edge Function invoked successfully`)
-      liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Response: ${JSON.stringify(data)}`)
-
-      toast.add({
-        severity: 'info',
-        summary: 'Sync Started',
-        detail: `${jobType === 'product_sync' ? 'Product' : 'Order'} sync has been initiated`
-      })
     } catch (error: any) {
       console.error('Sync error:', error)
       liveLogs.value.push(`[${new Date().toLocaleTimeString()}] FATAL ERROR: ${error.message || error}`)
@@ -194,6 +214,10 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
         detail: error.message || 'Failed to start sync'
       })
     }
+    // Note: We don't set syncing = false here for success, 
+    // we let the realtime subscription handle the 'completed' status update
+    // to ensure the UI is perfectly in sync with the DB state.
+    // However, if we error out, we force it false.
   }
 
   const cancelSync = async () => {
