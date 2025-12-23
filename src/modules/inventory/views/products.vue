@@ -210,80 +210,71 @@ const getStatusSeverity = (status: string) => {
 </script>
 
 <template>
-    <div class="flex flex-column gap-4">
+    <div class="flex flex-column gap-3">
         
         <!-- Page Header -->
-        <div class="surface-card shadow-2 p-4 border-round">
-            <div class="flex flex-column md:flex-row justify-content-between align-items-start md:align-items-center gap-3">
-                <div class="flex align-items-center gap-3">
-                    <div class="flex align-items-center justify-content-center bg-primary-100 border-round" style="width: 3.5rem; height: 3.5rem;">
-                        <i class="pi pi-box text-primary text-2xl"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-3xl font-bold m-0 mb-2 text-900">Products</h1>
-                        <p class="text-500 m-0">Manage your product catalog and inventory levels</p>
-                    </div>
-                </div>
-                <Button label="New Product" icon="pi pi-plus" size="large" @click="showCreateDialog = true" />
+        <div class="flex justify-content-between align-items-center">
+            <div class="flex align-items-center gap-2">
+                <i class="pi pi-box text-primary text-xl"></i>
+                <h1 class="text-xl font-bold m-0 text-900">Products</h1>
             </div>
+            <Button label="New Product" icon="pi pi-plus" size="small" @click="showCreateDialog = true" />
         </div>
 
         <!-- Stats Cards -->
         <div class="grid">
             <div class="col-12 md:col-6 lg:col-3">
-                <div class="surface-card shadow-2 p-4 border-round hover:shadow-4 transition-all transition-duration-200 cursor-pointer border-2 border-transparent hover:border-primary-200">
-                    <div class="flex justify-content-between align-items-start mb-3">
+                <div class="surface-card shadow-2 p-3 border-round hover:shadow-3 transition-all transition-duration-200 cursor-pointer border-1 border-transparent hover:border-primary-200">
+                    <div class="flex justify-content-between align-items-start">
                         <div class="flex-1">
-                            <span class="block text-500 font-medium mb-2 text-sm uppercase">Total Products</span>
-                            <div class="text-900 font-bold text-3xl mb-1">{{ statsRpc.total_products.toLocaleString() }}</div>
-                            <div class="flex align-items-center gap-2">
-                                <span class="text-green-600 font-semibold text-sm">{{ statsRpc.active_products }} active</span>
-                            </div>
+                            <span class="block text-500 font-medium mb-1 text-xs uppercase">Total Products</span>
+                            <div class="text-900 font-bold text-2xl mb-1">{{ statsRpc.total_products.toLocaleString() }}</div>
+                            <span class="text-green-600 font-semibold text-xs">{{ statsRpc.active_products }} active</span>
                         </div>
-                        <div class="flex align-items-center justify-content-center bg-blue-50 border-round-lg" style="width: 3rem; height: 3rem;">
-                            <i class="pi pi-box text-blue-500 text-xl"></i>
+                        <div class="flex align-items-center justify-content-center bg-blue-50 border-round" style="width: 2.5rem; height: 2.5rem;">
+                            <i class="pi pi-box text-blue-500"></i>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-12 md:col-6 lg:col-3">
-                <div class="surface-card shadow-2 p-4 border-round hover:shadow-4 transition-all transition-duration-200 cursor-pointer border-2 border-transparent hover:border-orange-200">
-                    <div class="flex justify-content-between align-items-start mb-3">
+                <div class="surface-card shadow-2 p-3 border-round hover:shadow-3 transition-all transition-duration-200 cursor-pointer border-1 border-transparent hover:border-orange-200">
+                    <div class="flex justify-content-between align-items-start">
                         <div class="flex-1">
-                            <span class="block text-500 font-medium mb-2 text-sm uppercase">Low Stock</span>
-                            <div class="text-900 font-bold text-3xl mb-1">{{ statsRpc.low_stock }}</div>
-                            <div class="text-600 text-sm">Below reorder point</div>
+                            <span class="block text-500 font-medium mb-1 text-xs uppercase">Low Stock</span>
+                            <div class="text-900 font-bold text-2xl mb-1">{{ statsRpc.low_stock }}</div>
+                            <span class="text-600 text-xs">Below reorder point</span>
                         </div>
-                        <div class="flex align-items-center justify-content-center bg-orange-50 border-round-lg" style="width: 3rem; height: 3rem;">
-                            <i class="pi pi-exclamation-triangle text-orange-500 text-xl"></i>
+                        <div class="flex align-items-center justify-content-center bg-orange-50 border-round" style="width: 2.5rem; height: 2.5rem;">
+                            <i class="pi pi-exclamation-triangle text-orange-500"></i>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-12 md:col-6 lg:col-3">
-                <div class="surface-card shadow-2 p-4 border-round hover:shadow-4 transition-all transition-duration-200 cursor-pointer border-2 border-transparent hover:border-red-200">
-                    <div class="flex justify-content-between align-items-start mb-3">
+                <div class="surface-card shadow-2 p-3 border-round hover:shadow-3 transition-all transition-duration-200 cursor-pointer border-1 border-transparent hover:border-red-200">
+                    <div class="flex justify-content-between align-items-start">
                         <div class="flex-1">
-                            <span class="block text-500 font-medium mb-2 text-sm uppercase">Out of Stock</span>
-                            <div class="text-900 font-bold text-3xl mb-1">{{ statsRpc.out_of_stock }}</div>
-                            <div class="text-600 text-sm">Available ≤ 0</div>
+                            <span class="block text-500 font-medium mb-1 text-xs uppercase">Out of Stock</span>
+                            <div class="text-900 font-bold text-2xl mb-1">{{ statsRpc.out_of_stock }}</div>
+                            <span class="text-600 text-xs">Available ≤ 0</span>
                         </div>
-                        <div class="flex align-items-center justify-content-center bg-red-50 border-round-lg" style="width: 3rem; height: 3rem;">
-                            <i class="pi pi-times-circle text-red-500 text-xl"></i>
+                        <div class="flex align-items-center justify-content-center bg-red-50 border-round" style="width: 2.5rem; height: 2.5rem;">
+                            <i class="pi pi-times-circle text-red-500"></i>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-12 md:col-6 lg:col-3">
-                <div class="surface-card shadow-2 p-4 border-round hover:shadow-4 transition-all transition-duration-200 cursor-pointer border-2 border-transparent hover:border-green-200">
-                    <div class="flex justify-content-between align-items-start mb-3">
+                <div class="surface-card shadow-2 p-3 border-round hover:shadow-3 transition-all transition-duration-200 cursor-pointer border-1 border-transparent hover:border-green-200">
+                    <div class="flex justify-content-between align-items-start">
                         <div class="flex-1">
-                            <span class="block text-500 font-medium mb-2 text-sm uppercase">Inventory Value</span>
-                            <div class="text-900 font-bold text-3xl mb-1">{{ formatCurrency(statsRpc.total_valuation) }}</div>
-                            <div class="text-600 text-sm">Total cost basis</div>
+                            <span class="block text-500 font-medium mb-1 text-xs uppercase">Inventory Value</span>
+                            <div class="text-900 font-bold text-2xl mb-1">{{ formatCurrency(statsRpc.total_valuation) }}</div>
+                            <span class="text-600 text-xs">Total cost basis</span>
                         </div>
-                        <div class="flex align-items-center justify-content-center bg-green-50 border-round-lg" style="width: 3rem; height: 3rem;">
-                            <i class="pi pi-dollar text-green-500 text-xl"></i>
+                        <div class="flex align-items-center justify-content-center bg-green-50 border-round" style="width: 2.5rem; height: 2.5rem;">
+                            <i class="pi pi-dollar text-green-500"></i>
                         </div>
                     </div>
                 </div>
@@ -293,10 +284,10 @@ const getStatusSeverity = (status: string) => {
         <!-- Data Table Card -->
         <div class="surface-card shadow-2 border-round overflow-hidden">
             <!-- Toolbar -->
-            <div class="flex flex-column md:flex-row justify-content-between align-items-start md:align-items-center gap-3 p-4 border-bottom-1 surface-border bg-gray-50">
+            <div class="flex flex-column md:flex-row justify-content-between align-items-start md:align-items-center gap-2 p-3 border-bottom-1 surface-border bg-gray-50">
                 <div class="flex align-items-center gap-2">
-                    <i class="pi pi-filter text-700 text-xl"></i>
-                    <span class="font-semibold text-900">Filter & Search</span>
+                    <i class="pi pi-filter text-700"></i>
+                    <span class="font-semibold text-900 text-sm">Filter & Search</span>
                 </div>
                 <div class="flex gap-2 w-full md:w-auto">
                     <Select 
@@ -338,22 +329,22 @@ const getStatusSeverity = (status: string) => {
                 responsiveLayout="scroll"
             >
                 <template #empty>
-                    <div class="flex flex-column align-items-center justify-content-center py-8">
-                        <div class="flex align-items-center justify-content-center bg-gray-100 border-round-xl mb-3" style="width: 64px; height: 64px;">
-                            <i class="pi pi-inbox text-4xl text-400"></i>
+                    <div class="flex flex-column align-items-center justify-content-center py-5">
+                        <div class="flex align-items-center justify-content-center bg-gray-100 border-round-xl mb-2" style="width: 48px; height: 48px;">
+                            <i class="pi pi-inbox text-3xl text-400"></i>
                         </div>
-                        <div class="text-700 font-semibold mb-1">No products found</div>
-                        <div class="text-500 text-sm">Try adjusting your filters or create a new product</div>
+                        <div class="text-700 font-semibold text-sm mb-1">No products found</div>
+                        <div class="text-500 text-xs">Try adjusting your filters or create a new product</div>
                     </div>
                 </template>
 
-                <Column header="Image" style="width: 5rem">
+                <Column header="Image" style="width: 4rem">
                     <template #body="{ data }">
-                        <div v-if="data.image_url" class="w-4rem h-4rem border-round-lg surface-50 flex align-items-center justify-content-center overflow-hidden border-1 surface-border shadow-1">
+                        <div v-if="data.image_url" class="w-3rem h-3rem border-round surface-50 flex align-items-center justify-content-center overflow-hidden border-1 surface-border">
                             <img :src="data.image_url" class="w-full h-full" style="object-fit: cover;" />
                         </div>
-                        <div v-else class="w-4rem h-4rem border-round-lg surface-100 flex align-items-center justify-content-center border-1 surface-border">
-                            <i class="pi pi-image text-400 text-xl"></i>
+                        <div v-else class="w-3rem h-3rem border-round surface-100 flex align-items-center justify-content-center border-1 surface-border">
+                            <i class="pi pi-image text-400"></i>
                         </div>
                     </template>
                 </Column>
@@ -407,7 +398,7 @@ const getStatusSeverity = (status: string) => {
                 <Column field="reserved" header="Reserved" sortable style="width: 9rem">
                     <template #body="{ data }">
                         <div class="flex align-items-center gap-2">
-                            <span :class="data.reserved > 0 ? 'text-orange-600 font-bold text-lg' : 'text-400'">
+                            <span :class="data.reserved > 0 ? 'text-orange-600 font-bold' : 'text-400'">
                                 {{ data.reserved }}
                             </span>
                             <Button 
@@ -427,7 +418,7 @@ const getStatusSeverity = (status: string) => {
                 <Column field="on_order" header="On Order" sortable style="width: 9rem">
                     <template #body="{ data }">
                         <div class="flex align-items-center gap-2">
-                            <span :class="data.on_order > 0 ? 'text-purple-600 font-bold text-lg' : 'text-400'">
+                            <span :class="data.on_order > 0 ? 'text-purple-600 font-bold' : 'text-400'">
                                 {{ data.on_order }}
                             </span>
                             <Button 
