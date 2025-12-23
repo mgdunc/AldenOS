@@ -170,7 +170,7 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
       while (hasMore && syncing.value) {
         liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Syncing page ${pageCount}...`)
 
-        const { data, error } = await supabase.functions.invoke<{
+        const response = await supabase.functions.invoke<{
           success: boolean
           nextPageInfo?: string
           jobId?: string
@@ -184,11 +184,17 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
           }
         })
 
+        const { data, error } = response
+
         if (error) {
           throw error
         }
 
-        if (data?.error) {
+        if (!data) {
+          throw new Error('No data returned from sync function')
+        }
+
+        if (data.error) {
           throw new Error(data.error)
         }
 
