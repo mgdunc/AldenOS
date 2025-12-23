@@ -193,9 +193,9 @@ onUnmounted(() => {
         </template>
       </Column>
 
-      <Column field="integrations.name" header="Store">
+      <Column field="integrations.name" header="Store" style="cursor: pointer">
         <template #body="{ data }">
-          <div class="flex align-items-center gap-2">
+          <div class="flex align-items-center gap-2" @click="$router.push(`/settings/shopify/queue/${data.id}`)">
             <i class="pi pi-shopping-bag text-green-600"></i>
             <span class="font-semibold">{{ data.integrations?.name || 'Unknown' }}</span>
           </div>
