@@ -29,7 +29,7 @@ const loadQueueItem = async () => {
       .from('sync_queue')
       .select(`
         *,
-        integrations!inner(id, name, provider, settings)
+        integrations(id, name, provider, settings)
       `)
       .eq('id', queueId.value)
       .single()

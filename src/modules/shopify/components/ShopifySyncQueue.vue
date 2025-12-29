@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -20,7 +20,7 @@ const loadQueue = async () => {
       .from('sync_queue')
       .select(`
         *,
-        integrations!inner(id, name, provider)
+        integrations(id, name, provider)
       `)
       .order('created_at', { ascending: false })
       .limit(50)
@@ -120,8 +120,10 @@ const retrySync = async (id: string) => {
         status: 'pending', 
         retry_count: 0,
         error_message: null,
+        error_type: null,
         started_at: null,
-        completed_at: null
+        completed_at: null,
+        last_heartbeat: null
       })
       .eq('id', id)
 
@@ -142,6 +144,47 @@ const retrySync = async (id: string) => {
   }
 }
 
+const resetStaleJobs = async () => {
+  try {
+    const { data, error } = await supabase.rpc('reset_stale_sync_jobs')
+    
+    if (error) throw error
+    
+    const count = data || 0
+    if (count > 0) {
+      toast.add({
+        severity: 'success',
+        summary: 'Reset Complete',
+        detail: `Reset ${count} stale job(s)`
+      })
+      loadQueue()
+    } else {
+      toast.add({
+        severity: 'info',
+        summary: 'No Stale Jobs',
+        detail: 'No stale jobs found to reset'
+      })
+    }
+  } catch (error: any) {
+    console.error('Error resetting stale jobs:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to reset stale jobs'
+    })
+  }
+}
+
+// Count stale jobs for badge
+const staleJobCount = computed(() => {
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+  return queue.value.filter(q => 
+    q.status === 'processing' && 
+    (!q.last_heartbeat || q.last_heartbeat < tenMinutesAgo) &&
+    (!q.started_at || q.started_at < tenMinutesAgo)
+  ).length
+})
+
 onMounted(() => {
   loadQueue()
   subscribeToQueue()
@@ -161,14 +204,27 @@ onUnmounted(() => {
         <i class="pi pi-list text-primary text-xl"></i>
         <span class="text-xl font-bold">Sync Queue</span>
       </div>
-      <Button 
-        icon="pi pi-refresh" 
-        text 
-        rounded 
-        @click="loadQueue" 
-        :loading="loading"
-        v-tooltip="'Refresh'"
-      />
+      <div class="flex align-items-center gap-2">
+        <Button 
+          v-if="staleJobCount > 0"
+          label="Reset Stale" 
+          icon="pi pi-exclamation-triangle" 
+          severity="warn"
+          size="small"
+          @click="resetStaleJobs"
+          v-tooltip="'Reset jobs stuck in processing'"
+          :badge="staleJobCount.toString()"
+          badgeSeverity="danger"
+        />
+        <Button 
+          icon="pi pi-refresh" 
+          text 
+          rounded 
+          @click="loadQueue" 
+          :loading="loading"
+          v-tooltip="'Refresh'"
+        />
+      </div>
     </div>
 
     <DataTable 

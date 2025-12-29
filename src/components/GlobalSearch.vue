@@ -10,7 +10,14 @@ import Badge from 'primevue/badge'
 const router = useRouter()
 const { loading, results, search, clear, getIcon, getTypeLabel } = useGlobalSearch()
 
-const visible = ref(false)
+const props = defineProps<{
+  visible?: boolean
+}>()
+
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+}>()
+
 const searchQuery = ref('')
 
 // Keyboard shortcut: Cmd+K or Ctrl+K
@@ -18,7 +25,7 @@ onMounted(() => {
   const handleKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault()
-      visible.value = true
+      emit('update:visible', true)
     }
   }
   
@@ -45,10 +52,15 @@ watch(searchQuery, (newQuery) => {
 })
 
 const selectResult = (result: any) => {
-  router.push(result.url)
-  visible.value = false
+  // Close dialog first, then navigate to prevent state conflicts
+  emit('update:visible', false)
   searchQuery.value = ''
   clear()
+  
+  // Navigate after a brief delay to ensure dialog is fully closed
+  setTimeout(() => {
+    router.push(result.url)
+  }, 100)
 }
 
 const handleClose = () => {
@@ -95,13 +107,14 @@ const getBadgeSeverity = (type: string) => {
 
 // Expose method to open from parent
 defineExpose({
-  open: () => { visible.value = true }
+  open: () => { emit('update:visible', true) }
 })
 </script>
 
 <template>
   <Dialog
-    v-model:visible="visible"
+    :visible="visible"
+    @update:visible="emit('update:visible', $event)"
     modal
     :draggable="false"
     :dismissableMask="true"
@@ -131,7 +144,7 @@ defineExpose({
         </div>
 
         <!-- Results Container -->
-        <div class="search-results" style="min-height: 250px; max-height: 60vh; overflow-y: auto;">
+        <div class="search-results" style="height: 400px; overflow-y: auto;">
           <!-- Loading State -->
           <div v-if="loading" class="flex flex-column align-items-center justify-content-center py-8 gap-3">
             <ProgressSpinner style="width: 40px; height: 40px" strokeWidth="3" />

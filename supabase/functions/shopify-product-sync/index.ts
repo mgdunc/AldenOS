@@ -61,6 +61,68 @@ serve(async (req: Request) => {
         throw new Error("Integration ID is required")
       }
 
+      // Helper to classify errors as retryable or permanent
+      const classifyError = (error: any): 'retryable' | 'permanent' | 'unknown' => {
+        const message = error.message?.toLowerCase() || ''
+        // Permanent errors - don't retry
+        if (message.includes('invalid api key') || 
+            message.includes('401') || 
+            message.includes('403') ||
+            message.includes('not found') ||
+            message.includes('shop not found')) {
+          return 'permanent'
+        }
+        // Retryable errors
+        if (message.includes('rate limit') || 
+            message.includes('429') ||
+            message.includes('timeout') ||
+            message.includes('network') ||
+            message.includes('econnreset') ||
+            message.includes('500') ||
+            message.includes('502') ||
+            message.includes('503') ||
+            message.includes('504')) {
+          return 'retryable'
+        }
+        return 'unknown'
+      }
+
+      // Helper to update heartbeat (keeps job alive)
+      const updateHeartbeat = async () => {
+        if (queueId) {
+          await supabase.from('sync_queue').update({
+            last_heartbeat: new Date().toISOString()
+          }).eq('id', queueId)
+        }
+      }
+
+      // Helper to save checkpoint for resumable syncs
+      const saveCheckpoint = async (checkpoint: any) => {
+        if (queueId) {
+          await supabase.from('sync_queue').update({
+            checkpoint,
+            last_heartbeat: new Date().toISOString()
+          }).eq('id', queueId)
+        }
+      }
+
+      // Check for concurrent sync on same integration (concurrency lock)
+      if (queueId) {
+        const { data: existingSync } = await supabase
+          .from('sync_queue')
+          .select('id')
+          .eq('integration_id', integrationId)
+          .eq('sync_type', 'product_sync')
+          .eq('status', 'processing')
+          .neq('id', queueId)
+          .maybeSingle()
+        
+        if (existingSync) {
+          console.log(`[SYNC] Another sync already processing for integration ${integrationId}`)
+          return { success: false, error: 'Another sync is already in progress for this integration' }
+        }
+      }
+
       const { data: integration, error: dbError } = await supabase
         .from('integrations')
         .select('id, settings')
@@ -163,7 +225,14 @@ serve(async (req: Request) => {
       // Fetch ONE page
       const limit = 250
       console.log(`[SYNC] Fetching page with limit ${limit}, page_info: ${page_info || 'none'}`)
+      
+      // Update heartbeat before fetching
+      await updateHeartbeat()
+      
       const { products, nextPageInfo } = await shopify.getProductsPage(limit, page_info)
+      
+      // Update heartbeat after fetching
+      await updateHeartbeat()
       
       console.log(`[SYNC] Fetched ${products.length} products, nextPageInfo: ${nextPageInfo ? 'present' : 'none'}`)
       await log(`Fetched batch of ${products.length} products from Shopify.`, "info")
@@ -326,9 +395,22 @@ serve(async (req: Request) => {
     } catch (error: any) {
       console.error('[SYNC] Error in sync process:', error)
       
+      // Classify the error
+      const classifyError = (err: any): 'retryable' | 'permanent' | 'unknown' => {
+        const message = err.message?.toLowerCase() || ''
+        if (message.includes('invalid api key') || message.includes('401') || message.includes('403') || message.includes('not found')) {
+          return 'permanent'
+        }
+        if (message.includes('rate limit') || message.includes('429') || message.includes('timeout') || message.includes('network') || message.includes('5')) {
+          return 'retryable'
+        }
+        return 'unknown'
+      }
+      const errorType = classifyError(error)
+      
       // Try to update job status if we have an ID
       if (jobId) {
-           console.log(`[SYNC] Marking job ${jobId} as failed`)
+           console.log(`[SYNC] Marking job ${jobId} as failed (${errorType})`)
            await supabase.from('integration_sync_jobs').update({
               status: 'failed',
               error_message: error.message,
@@ -337,23 +419,43 @@ serve(async (req: Request) => {
            
            // Also log to integration_logs
            await supabase.from('integration_logs').insert({
+              integration_id: integrationId,
               level: 'error',
               event_type: 'product_sync',
-              message: `Sync Failed: ${error.message}`,
-              details: { sync_id, jobId, error: error.message, stack: error.stack }
+              message: `Sync Failed (${errorType}): ${error.message}`,
+              details: { sync_id, jobId, error: error.message, errorType, stack: error.stack }
            })
       }
       
-      // Mark queue item as failed if queueId provided
+      // Mark queue item as failed if queueId provided, include error classification
       if (queueId) {
+        // For retryable errors with retries left, set back to pending
+        const { data: queueItem } = await supabase
+          .from('sync_queue')
+          .select('retry_count, max_retries, checkpoint')
+          .eq('id', queueId)
+          .single()
+        
+        const shouldRetry = errorType === 'retryable' && 
+                           queueItem && 
+                           queueItem.retry_count < queueItem.max_retries
+        
         await supabase.from('sync_queue').update({
-          status: 'failed',
+          status: shouldRetry ? 'pending' : 'failed',
           error_message: error.message,
-          completed_at: new Date().toISOString()
+          error_type: errorType,
+          retry_count: (queueItem?.retry_count || 0) + (shouldRetry ? 1 : 0),
+          completed_at: shouldRetry ? null : new Date().toISOString(),
+          started_at: shouldRetry ? null : undefined,
+          last_heartbeat: null
         }).eq('id', queueId)
+        
+        if (shouldRetry) {
+          console.log(`[SYNC] Retryable error, queued for retry (attempt ${(queueItem?.retry_count || 0) + 1}/${queueItem?.max_retries})`)
+        }
       }
       
-      return { success: false, error: error.message }
+      return { success: false, error: error.message, errorType }
     }
   }
 
