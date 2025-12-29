@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -1260,12 +1240,15 @@ export type Database = {
       }
       sync_queue: {
         Row: {
+          checkpoint: Json | null
           completed_at: string | null
           created_at: string
           created_by: string | null
           error_message: string | null
+          error_type: string | null
           id: string
           integration_id: string
+          last_heartbeat: string | null
           max_retries: number
           metadata: Json | null
           priority: number
@@ -1275,12 +1258,15 @@ export type Database = {
           sync_type: string
         }
         Insert: {
+          checkpoint?: Json | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           error_message?: string | null
+          error_type?: string | null
           id?: string
           integration_id: string
+          last_heartbeat?: string | null
           max_retries?: number
           metadata?: Json | null
           priority?: number
@@ -1290,12 +1276,15 @@ export type Database = {
           sync_type: string
         }
         Update: {
+          checkpoint?: Json | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           error_message?: string | null
+          error_type?: string | null
           id?: string
           integration_id?: string
+          last_heartbeat?: string | null
           max_retries?: number
           metadata?: Json | null
           priority?: number
@@ -1563,6 +1552,19 @@ export type Database = {
         }[]
       }
       get_product_stats: { Args: never; Returns: Json }
+      get_sync_health_stats: {
+        Args: { p_integration_id?: string }
+        Returns: {
+          avg_duration_seconds: number
+          failed_syncs: number
+          integration_id: string
+          last_failed_sync: string
+          last_successful_sync: string
+          success_rate: number
+          successful_syncs: number
+          total_syncs: number
+        }[]
+      }
       handle_po: {
         Args: {
           p_location_id: string
@@ -1616,6 +1618,7 @@ export type Database = {
         Args: { p_po_id: string }
         Returns: undefined
       }
+      reset_stale_sync_jobs: { Args: never; Returns: number }
       revert_fulfillment_shipment: {
         Args: { p_fulfillment_id: string; p_idempotency_key?: string }
         Returns: undefined
@@ -1784,11 +1787,7 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
 } as const
-
