@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useShopifyStore } from '../store'
 import { useShopifyIntegration } from '../composables/useShopifyIntegration'
+import { useShopifySync } from '../composables/useShopifySync'
 import ShopifyIntegrationCard from '../components/ShopifyIntegrationCard.vue'
 import ShopifyWebhooksCard from '../components/ShopifyWebhooksCard.vue'
 import ShopifyUnmatchedProducts from '../components/ShopifyUnmatchedProducts.vue'
@@ -15,6 +16,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Button from 'primevue/button'
+import Menu from 'primevue/menu'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +26,43 @@ const { loadIntegrations } = useShopifyIntegration()
 
 const integrationId = computed(() => route.params.id as string)
 const isNew = computed(() => integrationId.value === 'new')
+
+const integration = ref<any>(null)
+const syncMenu = ref()
+
+// Sync composables - only initialize when we have a valid integrationId
+const productSync = computed(() => {
+  if (isNew.value || !integrationId.value) return null
+  return useShopifySync(integrationId.value, 'product_sync')
+})
+
+const orderSync = computed(() => {
+  if (isNew.value || !integrationId.value) return null
+  return useShopifySync(integrationId.value, 'order_sync')
+})
+
+const isSyncing = computed(() => {
+  return productSync.value?.syncing.value || orderSync.value?.syncing.value
+})
+
+const syncMenuItems = computed(() => [
+  {
+    label: 'Sync Products',
+    icon: 'pi pi-box',
+    command: () => productSync.value?.startSync(),
+    disabled: productSync.value?.syncing.value
+  },
+  {
+    label: 'Sync Orders',
+    icon: 'pi pi-shopping-cart',
+    command: () => orderSync.value?.startSync(),
+    disabled: orderSync.value?.syncing.value
+  }
+])
+
+const toggleSyncMenu = (event: Event) => {
+  syncMenu.value.toggle(event)
+}
 
 const integration = ref<any>(null)
 
@@ -86,6 +125,16 @@ onMounted(() => {
         <p class="text-sm text-600 m-0">
           {{ isNew ? 'Connect a new Shopify store to sync products and orders.' : 'Manage sync settings and view activity logs.' }}
         </p>
+      </div>
+      <div v-if="!isNew" class="flex gap-2">
+        <Button 
+          label="Sync Now" 
+          icon="pi pi-sync" 
+          :loading="isSyncing"
+          severity="success"
+          @click="toggleSyncMenu"
+        />
+        <Menu ref="syncMenu" :model="syncMenuItems" :popup="true" />
       </div>
     </div>
 
