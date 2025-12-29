@@ -64,8 +64,6 @@ const toggleSyncMenu = (event: Event) => {
   syncMenu.value.toggle(event)
 }
 
-const integration = ref<any>(null)
-
 const loadIntegration = async () => {
   if (isNew.value) {
     integration.value = {
