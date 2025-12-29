@@ -1,13 +1,8 @@
 export const routes = [
   {
     path: '/settings/shopify',
-    name: 'shopify-integrations',
-    component: () => import('./views/ShopifyIntegrationsListView.vue')
-  },
-  {
-    path: '/settings/shopify/:id',
-    name: 'shopify-integration-detail',
-    component: () => import('./views/ShopifyIntegrationDetailView.vue')
+    name: 'shopify-settings',
+    component: () => import('./views/ShopifySettingsView.vue')
   },
   {
     path: '/settings/shopify/queue',

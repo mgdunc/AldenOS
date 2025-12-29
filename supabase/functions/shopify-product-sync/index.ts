@@ -150,6 +150,7 @@ serve(async (req: Request) => {
           .from('integration_sync_jobs')
           .insert({
             integration_id: integration.id,
+            integration_type: 'shopify',
             job_type: 'product_sync',
             status: 'pending',
             total_items: 0,

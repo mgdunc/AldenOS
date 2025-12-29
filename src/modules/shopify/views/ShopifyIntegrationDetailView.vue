@@ -6,12 +6,9 @@ import { useShopifyStore } from '../store'
 import { useShopifyIntegration } from '../composables/useShopifyIntegration'
 import ShopifyIntegrationCard from '../components/ShopifyIntegrationCard.vue'
 import ShopifyWebhooksCard from '../components/ShopifyWebhooksCard.vue'
-import ShopifyLogsCard from '../components/ShopifyLogsCard.vue'
-import ShopifyProductSyncCard from '../components/ShopifyProductSyncCard.vue'
-import ShopifyOrderSyncCard from '../components/ShopifyOrderSyncCard.vue'
 import ShopifyUnmatchedProducts from '../components/ShopifyUnmatchedProducts.vue'
-import ShopifyFunctionStatus from '../components/ShopifyFunctionStatus.vue'
-import ShopifySyncQueue from '../components/ShopifySyncQueue.vue'
+import ShopifyIntegrationQueue from '../components/ShopifyIntegrationQueue.vue'
+import ShopifySyncHealthStats from '../components/ShopifySyncHealthStats.vue'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -107,35 +104,23 @@ onMounted(() => {
       <div v-if="!isNew">
         <Tabs value="0">
           <TabList>
-            <Tab value="0"><i class="pi pi-box mr-2"></i>Product Sync</Tab>
-            <Tab value="1"><i class="pi pi-shopping-cart mr-2"></i>Order Sync</Tab>
-            <Tab value="2"><i class="pi pi-list mr-2"></i>Sync Queue</Tab>
-            <Tab value="3"><i class="pi pi-question-circle mr-2"></i>Unmatched</Tab>
-            <Tab value="4"><i class="pi pi-history mr-2"></i>Activity Logs</Tab>
-            <Tab value="5"><i class="pi pi-bolt mr-2"></i>Webhooks</Tab>
-            <Tab value="6"><i class="pi pi-server mr-2"></i>Function Status</Tab>
+            <Tab value="0"><i class="pi pi-list mr-2"></i>Sync Queue</Tab>
+            <Tab value="1"><i class="pi pi-heart mr-2"></i>Health</Tab>
+            <Tab value="2"><i class="pi pi-question-circle mr-2"></i>Unmatched</Tab>
+            <Tab value="3"><i class="pi pi-bolt mr-2"></i>Webhooks</Tab>
           </TabList>
           <TabPanels>
             <TabPanel value="0">
-              <ShopifyProductSyncCard :integration-id="integrationId" />
+              <ShopifyIntegrationQueue :integration-id="integrationId" />
             </TabPanel>
             <TabPanel value="1">
-              <ShopifyOrderSyncCard :integration-id="integrationId" />
+              <ShopifySyncHealthStats :integration-id="integrationId" />
             </TabPanel>
             <TabPanel value="2">
-              <ShopifySyncQueue />
-            </TabPanel>
-            <TabPanel value="3">
               <ShopifyUnmatchedProducts :integration-id="integrationId" />
             </TabPanel>
-            <TabPanel value="4">
-              <ShopifyLogsCard :integration-id="integrationId" />
-            </TabPanel>
-            <TabPanel value="5">
+            <TabPanel value="3">
               <ShopifyWebhooksCard :integration-id="integrationId" />
-            </TabPanel>
-            <TabPanel value="6">
-              <ShopifyFunctionStatus :integration-id="integrationId" />
             </TabPanel>
           </TabPanels>
         </Tabs>
