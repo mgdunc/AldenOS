@@ -176,6 +176,46 @@ const resetStaleJobs = async () => {
   }
 }
 
+const resetAllProcessing = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('sync_queue')
+      .update({ 
+        status: 'pending',
+        started_at: null,
+        last_heartbeat: null,
+        error_message: null
+      })
+      .eq('status', 'processing')
+      .select('id')
+    
+    if (error) throw error
+    
+    const count = data?.length || 0
+    if (count > 0) {
+      toast.add({
+        severity: 'success',
+        summary: 'Reset Complete',
+        detail: `Reset ${count} processing job(s) to pending`
+      })
+      loadQueue()
+    } else {
+      toast.add({
+        severity: 'info',
+        summary: 'No Processing Jobs',
+        detail: 'No jobs currently in processing state'
+      })
+    }
+  } catch (error: any) {
+    logger.error('Error resetting processing jobs:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to reset processing jobs'
+    })
+  }
+}
+
 const runQueueItem = async (item: any) => {
   try {
     // First, mark as processing
@@ -430,6 +470,7 @@ const processAllPending = async () => {
 }
 
 const pendingCount = computed(() => queue.value.filter(q => q.status === 'pending').length)
+const processingCount = computed(() => queue.value.filter(q => q.status === 'processing').length)
 
 // Count stale jobs for badge
 const staleJobCount = computed(() => {
@@ -471,6 +512,17 @@ onUnmounted(() => {
           v-tooltip="'Process all pending queue items'"
           :badge="pendingCount.toString()"
           badgeSeverity="info"
+        />
+        <Button 
+          v-if="processingCount > 0"
+          label="Reset Stuck" 
+          icon="pi pi-refresh" 
+          severity="danger"
+          size="small"
+          @click="resetAllProcessing"
+          v-tooltip="'Reset all processing jobs back to pending'"
+          :badge="processingCount.toString()"
+          badgeSeverity="danger"
         />
         <Button 
           v-if="staleJobCount > 0"
