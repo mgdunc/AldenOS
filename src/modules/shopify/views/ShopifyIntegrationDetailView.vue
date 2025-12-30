@@ -11,6 +11,7 @@ import ShopifyWebhooksCard from '../components/ShopifyWebhooksCard.vue'
 import ShopifyUnmatchedProducts from '../components/ShopifyUnmatchedProducts.vue'
 import ShopifyIntegrationQueue from '../components/ShopifyIntegrationQueue.vue'
 import ShopifySyncHealthStats from '../components/ShopifySyncHealthStats.vue'
+import UnifiedSyncCard from '../components/UnifiedSyncCard.vue'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -220,6 +221,11 @@ onUnmounted(() => {
         :integration-id="isNew ? null : integrationId"
         @saved="onSaved"
       />
+
+      <!-- Unified Sync Card for existing integrations -->
+      <div v-if="!isNew" class="mb-3">
+        <UnifiedSyncCard :integration-id="integrationId" />
+      </div>
 
       <!-- Tabs for existing integrations -->
       <div v-if="!isNew">

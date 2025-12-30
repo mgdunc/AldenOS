@@ -153,6 +153,96 @@ const retrySync = async (id: string) => {
   }
 }
 
+const runQueueItem = async (item: any) => {
+  try {
+    // First, mark as processing
+    // Try with last_heartbeat first (column exists in DB but PostgREST cache might not be updated)
+    const { error: updateError } = await supabase
+      .from('sync_queue')
+      .update({ 
+        status: 'processing',
+        started_at: new Date().toISOString(),
+        last_heartbeat: new Date().toISOString()
+      })
+      .eq('id', item.id)
+
+    if (updateError) {
+      // If it's a column not found error (PostgREST schema cache issue), try without last_heartbeat
+      if (updateError.code === 'PGRST204' && updateError.message?.includes('last_heartbeat')) {
+        logger.warn('last_heartbeat column not found in PostgREST schema cache, updating without it. Cache will refresh automatically.', updateError)
+        const { error: retryError } = await supabase
+          .from('sync_queue')
+          .update({
+            status: 'processing',
+            started_at: new Date().toISOString()
+          })
+          .eq('id', item.id)
+        
+        if (retryError) throw retryError
+      } else {
+        throw updateError
+      }
+    }
+
+    // Determine which function to call
+    let functionName = ''
+    switch (item.sync_type) {
+      case 'product_sync':
+        functionName = 'shopify-product-sync'
+        break
+      case 'order_sync':
+        functionName = 'shopify-order-sync'
+        break
+      default:
+        throw new Error(`Unknown sync type: ${item.sync_type}`)
+    }
+
+    toast.add({
+      severity: 'info',
+      summary: 'Processing',
+      detail: `Starting ${getSyncTypeLabel(item.sync_type)} sync...`
+    })
+
+    // Invoke the sync function directly
+    const { data, error } = await supabase.functions.invoke(functionName, {
+      body: {
+        integrationId: item.integration_id,
+        queueId: item.id,
+        metadata: item.metadata
+      }
+    })
+
+    if (error) throw error
+
+    toast.add({
+      severity: 'success',
+      summary: 'Started',
+      detail: `${getSyncTypeLabel(item.sync_type)} sync has been started`
+    })
+
+    // Reload queue to show updated status
+    await loadQueue()
+  } catch (error: any) {
+    logger.error('Error running queue item:', error)
+    
+    // Mark as failed if error occurred
+    await supabase
+      .from('sync_queue')
+      .update({
+        status: 'failed',
+        error_message: error.message || 'Failed to start sync',
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', item.id)
+
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message || 'Failed to start sync'
+    })
+  }
+}
+
 // Stats
 const stats = computed(() => {
   const total = queue.value.length
@@ -261,7 +351,7 @@ onUnmounted(() => {
         </template>
       </Column>
 
-      <Column header="Actions" style="width: 120px">
+      <Column header="Actions" style="width: 180px">
         <template #body="{ data }">
           <div class="flex gap-1">
             <Button 
@@ -271,6 +361,16 @@ onUnmounted(() => {
               size="small"
               @click="viewDetails(data.id)"
               v-tooltip="'View Details'"
+            />
+            <Button 
+              v-if="data.status === 'pending'"
+              icon="pi pi-play" 
+              severity="success"
+              text
+              rounded
+              size="small"
+              @click="runQueueItem(data)"
+              v-tooltip="'Run Now'"
             />
             <Button 
               v-if="data.status === 'pending' || data.status === 'processing'"

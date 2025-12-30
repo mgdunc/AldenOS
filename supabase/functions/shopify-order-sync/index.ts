@@ -435,10 +435,21 @@ serve(async (req: Request) => {
   // Run the sync
   const result = await runSync()
 
+  // Always return 200 to ensure response body is accessible
+  // Include error information in the response body instead
+  const status = result.success ? 200 : 200 // Always 200 so client can read response body
+  const responseBody = result.success 
+    ? result 
+    : { 
+        success: false, 
+        error: result.error || 'Unknown error',
+        errorType: result.errorType || 'unknown'
+      }
+
   return new Response(
-    JSON.stringify(result),
+    JSON.stringify(responseBody),
     { 
-      status: result.success ? 200 : 500,
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     }
   )

@@ -176,6 +176,142 @@ const resetStaleJobs = async () => {
   }
 }
 
+const runQueueItem = async (item: any) => {
+  try {
+    // First, mark as processing
+    // Try with last_heartbeat first (column exists in DB but PostgREST cache might not be updated)
+    const { error: updateError } = await supabase
+      .from('sync_queue')
+      .update({ 
+        status: 'processing',
+        started_at: new Date().toISOString(),
+        last_heartbeat: new Date().toISOString()
+      })
+      .eq('id', item.id)
+
+    if (updateError) {
+      // If it's a column not found error (PostgREST schema cache issue), try without last_heartbeat
+      if (updateError.code === 'PGRST204' && updateError.message?.includes('last_heartbeat')) {
+        logger.warn('last_heartbeat column not found in PostgREST schema cache, updating without it. Cache will refresh automatically.', updateError)
+        const { error: retryError } = await supabase
+          .from('sync_queue')
+          .update({
+            status: 'processing',
+            started_at: new Date().toISOString()
+          })
+          .eq('id', item.id)
+        
+        if (retryError) throw retryError
+      } else {
+        throw updateError
+      }
+    }
+
+    // Determine which function to call
+    let functionName = ''
+    switch (item.sync_type) {
+      case 'product_sync':
+        functionName = 'shopify-product-sync'
+        break
+      case 'order_sync':
+        functionName = 'shopify-order-sync'
+        break
+      default:
+        throw new Error(`Unknown sync type: ${item.sync_type}`)
+    }
+
+    toast.add({
+      severity: 'info',
+      summary: 'Processing',
+      detail: `Starting ${getSyncTypeLabel(item.sync_type)} sync...`
+    })
+
+    // Invoke the sync function directly
+    const { data, error } = await supabase.functions.invoke(functionName, {
+      body: {
+        integrationId: item.integration_id,
+        queueId: item.id,
+        metadata: item.metadata
+      }
+    })
+
+    if (error) throw error
+
+    toast.add({
+      severity: 'success',
+      summary: 'Started',
+      detail: `${getSyncTypeLabel(item.sync_type)} sync has been started`
+    })
+
+    // Reload queue to show updated status
+    await loadQueue()
+  } catch (error: any) {
+    logger.error('Error running queue item:', error)
+    
+    // Mark as failed if error occurred
+    await supabase
+      .from('sync_queue')
+      .update({
+        status: 'failed',
+        error_message: error.message || 'Failed to start sync',
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', item.id)
+
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message || 'Failed to start sync'
+    })
+  }
+}
+
+const processAllPending = async () => {
+  try {
+    const pendingCount = queue.value.filter(q => q.status === 'pending').length
+    
+    if (pendingCount === 0) {
+      toast.add({
+        severity: 'info',
+        summary: 'No Pending Items',
+        detail: 'There are no pending items to process'
+      })
+      return
+    }
+
+    toast.add({
+      severity: 'info',
+      summary: 'Processing',
+      detail: `Processing ${pendingCount} pending item(s)...`
+    })
+
+    // Invoke the queue processor
+    const { data, error } = await supabase.functions.invoke('sync-queue-processor', {})
+
+    if (error) throw error
+
+    toast.add({
+      severity: 'success',
+      summary: 'Processing Started',
+      detail: data?.message || `Processing ${data?.processed || pendingCount} item(s)`
+    })
+
+    // Reload queue after a short delay
+    setTimeout(() => {
+      loadQueue()
+    }, 1000)
+  } catch (error: any) {
+    logger.error('Error processing pending items:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message || 'Failed to process pending items'
+    })
+  }
+}
+
+const pendingCount = computed(() => queue.value.filter(q => q.status === 'pending').length)
+
 // Count stale jobs for badge
 const staleJobCount = computed(() => {
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
@@ -206,6 +342,17 @@ onUnmounted(() => {
         <span class="text-xl font-bold">Sync Queue</span>
       </div>
       <div class="flex align-items-center gap-2">
+        <Button 
+          v-if="pendingCount > 0"
+          label="Process All Pending" 
+          icon="pi pi-play" 
+          severity="success"
+          size="small"
+          @click="processAllPending"
+          v-tooltip="'Process all pending queue items'"
+          :badge="pendingCount.toString()"
+          badgeSeverity="info"
+        />
         <Button 
           v-if="staleJobCount > 0"
           label="Reset Stale" 
@@ -295,9 +442,19 @@ onUnmounted(() => {
         </template>
       </Column>
 
-      <Column header="Actions" style="width: 120px">
+      <Column header="Actions" style="width: 180px">
         <template #body="{ data }">
           <div class="flex gap-1">
+            <Button 
+              v-if="data.status === 'pending'"
+              icon="pi pi-play" 
+              severity="success"
+              text
+              rounded
+              size="small"
+              @click="runQueueItem(data)"
+              v-tooltip="'Run Now'"
+            />
             <Button 
               v-if="data.status === 'pending' || data.status === 'processing'"
               icon="pi pi-times" 

@@ -18,7 +18,22 @@ const loadStats = async () => {
         p_integration_id: props.integrationId || null 
       })
 
-    if (error) throw error
+    if (error) {
+      // Check if it's a function not found error (PostgREST schema cache issue)
+      if (error.code === 'PGRST202' || error.message?.includes('Could not find the function')) {
+        logger.error('Database function get_sync_health_stats not found. This may be a PostgREST schema cache issue.', error, {
+          integrationId: props.integrationId,
+          component: 'ShopifySyncHealthStats',
+          suggestion: 'The function exists but PostgREST cache needs refresh. Wait a few minutes or refresh the page.',
+          errorCode: error.code,
+          errorDetails: error.details
+        })
+        // Set stats to null to show "No data available" message
+        stats.value = null
+        return
+      }
+      throw error
+    }
     
     // If specific integration, get first row; otherwise aggregate
     if (props.integrationId && data?.length > 0) {
@@ -43,7 +58,14 @@ const loadStats = async () => {
       }
     }
   } catch (error: any) {
-    logger.error('Error loading sync health stats', error)
+    // Log to console and database
+    logger.error('Error loading sync health stats', error, {
+      integrationId: props.integrationId,
+      component: 'ShopifySyncHealthStats'
+    })
+    
+    // Show user-friendly message
+    stats.value = null
   } finally {
     loading.value = false
   }
