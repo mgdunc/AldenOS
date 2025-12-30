@@ -39,6 +39,14 @@ const saveCurrency = () => {
 
     <h3 class="text-xl font-bold mb-3">Developer Tools</h3>
     <div class="flex gap-3 flex-wrap">
+      <router-link to="/dev/diagnostics" class="p-button p-button-secondary no-underline">
+        <i class="pi pi-cog mr-2"></i>
+        System Diagnostics
+      </router-link>
+      <router-link to="/dev/logs" class="p-button p-button-secondary no-underline">
+        <i class="pi pi-list mr-2"></i>
+        System Logs
+      </router-link>
       <a href="http://localhost:51204/__vitest__/" target="_blank" class="p-button p-button-secondary no-underline">
         <i class="pi pi-check-circle mr-2"></i>
         Open Test Dashboard
