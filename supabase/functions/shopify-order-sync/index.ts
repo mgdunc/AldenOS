@@ -229,26 +229,24 @@ serve(async (req: Request) => {
               .update({
                 status: newStatus,
                 total_amount: parseFloat(order.total_price) || 0,
-                shipping_address: order.shipping_address ? {
-                  name: order.shipping_address.name,
-                  address1: order.shipping_address.address1,
-                  address2: order.shipping_address.address2,
-                  city: order.shipping_address.city,
-                  province: order.shipping_address.province,
-                  country: order.shipping_address.country,
-                  zip: order.shipping_address.zip,
-                  phone: order.shipping_address.phone
-                } : null,
-                billing_address: order.billing_address ? {
-                  name: order.billing_address.name,
-                  address1: order.billing_address.address1,
-                  address2: order.billing_address.address2,
-                  city: order.billing_address.city,
-                  province: order.billing_address.province,
-                  country: order.billing_address.country,
-                  zip: order.billing_address.zip,
-                  phone: order.billing_address.phone
-                } : null
+                // Shipping address fields
+                shipping_name: order.shipping_address?.name || null,
+                shipping_address1: order.shipping_address?.address1 || null,
+                shipping_address2: order.shipping_address?.address2 || null,
+                shipping_city: order.shipping_address?.city || null,
+                shipping_province: order.shipping_address?.province || null,
+                shipping_zip: order.shipping_address?.zip || null,
+                shipping_country: order.shipping_address?.country || null,
+                shipping_phone: order.shipping_address?.phone || null,
+                // Billing address fields
+                billing_name: order.billing_address?.name || null,
+                billing_address1: order.billing_address?.address1 || null,
+                billing_address2: order.billing_address?.address2 || null,
+                billing_city: order.billing_address?.city || null,
+                billing_province: order.billing_address?.province || null,
+                billing_zip: order.billing_address?.zip || null,
+                billing_country: order.billing_address?.country || null,
+                billing_phone: order.billing_address?.phone || null
               })
               .eq('id', existingOrder.id)
             
@@ -354,26 +352,24 @@ serve(async (req: Request) => {
                 customer_id: customerId,
                 status: mapOrderStatusForNew(),
                 total_amount: parseFloat(order.total_price) || 0,
-                shipping_address: order.shipping_address ? {
-                  name: order.shipping_address.name,
-                  address1: order.shipping_address.address1,
-                  address2: order.shipping_address.address2,
-                  city: order.shipping_address.city,
-                  province: order.shipping_address.province,
-                  country: order.shipping_address.country,
-                  zip: order.shipping_address.zip,
-                  phone: order.shipping_address.phone
-                } : null,
-                billing_address: order.billing_address ? {
-                  name: order.billing_address.name,
-                  address1: order.billing_address.address1,
-                  address2: order.billing_address.address2,
-                  city: order.billing_address.city,
-                  province: order.billing_address.province,
-                  country: order.billing_address.country,
-                  zip: order.billing_address.zip,
-                  phone: order.billing_address.phone
-                } : null
+                // Shipping address fields
+                shipping_name: order.shipping_address?.name || null,
+                shipping_address1: order.shipping_address?.address1 || null,
+                shipping_address2: order.shipping_address?.address2 || null,
+                shipping_city: order.shipping_address?.city || null,
+                shipping_province: order.shipping_address?.province || null,
+                shipping_zip: order.shipping_address?.zip || null,
+                shipping_country: order.shipping_address?.country || null,
+                shipping_phone: order.shipping_address?.phone || null,
+                // Billing address fields
+                billing_name: order.billing_address?.name || null,
+                billing_address1: order.billing_address?.address1 || null,
+                billing_address2: order.billing_address?.address2 || null,
+                billing_city: order.billing_address?.city || null,
+                billing_province: order.billing_address?.province || null,
+                billing_zip: order.billing_address?.zip || null,
+                billing_country: order.billing_address?.country || null,
+                billing_phone: order.billing_address?.phone || null
               })
               .select('id')
               .single()
