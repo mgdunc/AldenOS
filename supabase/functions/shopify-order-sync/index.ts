@@ -185,7 +185,7 @@ serve(async (req: Request) => {
       let processedCount = 0
       let matchedCount = 0
       let createdCount = 0
-      let skippedCount = 0
+      let updatedCount = 0
       let errorCount = 0
 
       // Process each order
@@ -198,11 +198,106 @@ serve(async (req: Request) => {
             .eq('shopify_order_id', order.id)
             .maybeSingle()
 
+          // Map Shopify status to our status
+          const mapOrderStatus = () => {
+            if (order.cancelled_at) return 'cancelled'
+            if (order.fulfillment_status === 'fulfilled') return 'completed'
+            if (order.fulfillment_status === 'partial') return 'partially_shipped'
+            if (order.financial_status === 'paid' || order.financial_status === 'partially_paid') return 'confirmed'
+            return 'draft'
+          }
+
           if (existingOrder) {
-            // Order exists - skip
+            // Order exists - UPDATE it
             matchedCount++
-            skippedCount++
-            await logger.debug(`Order #${order.order_number} already exists`, { orderId: existingOrder.id })
+            
+            const newStatus = mapOrderStatus()
+            
+            // Update order details
+            const { error: updateError } = await supabase
+              .from('sales_orders')
+              .update({
+                status: newStatus,
+                total_amount: parseFloat(order.total_price) || 0,
+                shipping_address: order.shipping_address ? {
+                  name: order.shipping_address.name,
+                  address1: order.shipping_address.address1,
+                  address2: order.shipping_address.address2,
+                  city: order.shipping_address.city,
+                  province: order.shipping_address.province,
+                  country: order.shipping_address.country,
+                  zip: order.shipping_address.zip,
+                  phone: order.shipping_address.phone
+                } : null,
+                billing_address: order.billing_address ? {
+                  name: order.billing_address.name,
+                  address1: order.billing_address.address1,
+                  address2: order.billing_address.address2,
+                  city: order.billing_address.city,
+                  province: order.billing_address.province,
+                  country: order.billing_address.country,
+                  zip: order.billing_address.zip,
+                  phone: order.billing_address.phone
+                } : null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingOrder.id)
+            
+            if (updateError) {
+              await logger.error(`Failed to update order #${order.order_number}`, updateError)
+              errorCount++
+            } else {
+              updatedCount++
+              await logger.debug(`Updated order #${order.order_number}`, { 
+                orderId: existingOrder.id, 
+                status: newStatus,
+                previousStatus: existingOrder.status 
+              })
+              
+              // Update line items - remove old and add new for simplicity
+              // (more sophisticated logic could diff and update in place)
+              if (order.line_items && order.line_items.length > 0) {
+                // Delete existing line items
+                await supabase
+                  .from('sales_order_lines')
+                  .delete()
+                  .eq('sales_order_id', existingOrder.id)
+                
+                // Re-create line items
+                for (const lineItem of order.line_items) {
+                  let productId = null
+                  
+                  if (lineItem.sku) {
+                    const { data: product } = await supabase
+                      .from('products')
+                      .select('id')
+                      .eq('sku', lineItem.sku)
+                      .maybeSingle()
+                    if (product) productId = product.id
+                  }
+                  
+                  if (!productId && lineItem.variant_id) {
+                    const { data: product } = await supabase
+                      .from('products')
+                      .select('id')
+                      .eq('shopify_variant_id', lineItem.variant_id)
+                      .maybeSingle()
+                    if (product) productId = product.id
+                  }
+                  
+                  if (productId) {
+                    await supabase
+                      .from('sales_order_lines')
+                      .insert({
+                        sales_order_id: existingOrder.id,
+                        product_id: productId,
+                        quantity_ordered: lineItem.quantity,
+                        unit_price: parseFloat(lineItem.price) || 0
+                      })
+                  }
+                }
+              }
+            }
           } else {
             // Create new order
             // Find or create customer
@@ -241,18 +336,6 @@ serve(async (req: Request) => {
               }
             }
 
-            // Map Shopify status to our status
-            let status = 'draft'
-            if (order.cancelled_at) {
-              status = 'cancelled'
-            } else if (order.fulfillment_status === 'fulfilled') {
-              status = 'completed'
-            } else if (order.fulfillment_status === 'partial') {
-              status = 'partially_shipped'
-            } else if (order.financial_status === 'paid' || order.financial_status === 'partially_paid') {
-              status = 'confirmed'
-            }
-
             // Create the sales order
             const { data: newOrder, error: orderError } = await supabase
               .from('sales_orders')
@@ -260,7 +343,7 @@ serve(async (req: Request) => {
                 shopify_order_id: order.id,
                 customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : null,
                 customer_id: customerId,
-                status: status,
+                status: mapOrderStatus(),
                 total_amount: parseFloat(order.total_price) || 0,
                 shipping_address: order.shipping_address ? {
                   name: order.shipping_address.name,
@@ -403,12 +486,12 @@ serve(async (req: Request) => {
           }).eq('id', queueId)
         }
 
-        await log(`Order sync completed. Created: ${createdCount}, Matched: ${matchedCount}, Errors: ${errorCount}`, "success")
-        await logger.info(`Sync complete!`, { createdCount, matchedCount, errorCount, processedCount })
+        await log(`Order sync completed. Created: ${createdCount}, Updated: ${updatedCount}, Errors: ${errorCount}`, "success")
+        await logger.info(`Sync complete!`, { createdCount, updatedCount, matchedCount, errorCount, processedCount })
         
         return { 
           success: true, 
-          message: `Processed ${processedCount} orders. Created: ${createdCount}, Skipped: ${skippedCount}`,
+          message: `Processed ${processedCount} orders. Created: ${createdCount}, Updated: ${updatedCount}`,
           jobId 
         }
       } else {
