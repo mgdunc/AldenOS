@@ -229,24 +229,38 @@ serve(async (req: Request) => {
               .update({
                 status: newStatus,
                 total_amount: parseFloat(order.total_price) || 0,
-                // Shipping address fields
+                // Shipping address fields (per Shopify API)
+                shipping_first_name: order.shipping_address?.first_name || null,
+                shipping_last_name: order.shipping_address?.last_name || null,
                 shipping_name: order.shipping_address?.name || null,
+                shipping_company: order.shipping_address?.company || null,
                 shipping_address1: order.shipping_address?.address1 || null,
                 shipping_address2: order.shipping_address?.address2 || null,
                 shipping_city: order.shipping_address?.city || null,
                 shipping_province: order.shipping_address?.province || null,
+                shipping_province_code: order.shipping_address?.province_code || null,
                 shipping_zip: order.shipping_address?.zip || null,
                 shipping_country: order.shipping_address?.country || null,
+                shipping_country_code: order.shipping_address?.country_code || null,
                 shipping_phone: order.shipping_address?.phone || null,
-                // Billing address fields
+                shipping_latitude: order.shipping_address?.latitude ? parseFloat(order.shipping_address.latitude) : null,
+                shipping_longitude: order.shipping_address?.longitude ? parseFloat(order.shipping_address.longitude) : null,
+                // Billing address fields (per Shopify API)
+                billing_first_name: order.billing_address?.first_name || null,
+                billing_last_name: order.billing_address?.last_name || null,
                 billing_name: order.billing_address?.name || null,
+                billing_company: order.billing_address?.company || null,
                 billing_address1: order.billing_address?.address1 || null,
                 billing_address2: order.billing_address?.address2 || null,
                 billing_city: order.billing_address?.city || null,
                 billing_province: order.billing_address?.province || null,
+                billing_province_code: order.billing_address?.province_code || null,
                 billing_zip: order.billing_address?.zip || null,
                 billing_country: order.billing_address?.country || null,
-                billing_phone: order.billing_address?.phone || null
+                billing_country_code: order.billing_address?.country_code || null,
+                billing_phone: order.billing_address?.phone || null,
+                billing_latitude: order.billing_address?.latitude ? parseFloat(order.billing_address.latitude) : null,
+                billing_longitude: order.billing_address?.longitude ? parseFloat(order.billing_address.longitude) : null
               })
               .eq('id', existingOrder.id)
             
@@ -352,24 +366,38 @@ serve(async (req: Request) => {
                 customer_id: customerId,
                 status: mapOrderStatusForNew(),
                 total_amount: parseFloat(order.total_price) || 0,
-                // Shipping address fields
+                // Shipping address fields (per Shopify API)
+                shipping_first_name: order.shipping_address?.first_name || null,
+                shipping_last_name: order.shipping_address?.last_name || null,
                 shipping_name: order.shipping_address?.name || null,
+                shipping_company: order.shipping_address?.company || null,
                 shipping_address1: order.shipping_address?.address1 || null,
                 shipping_address2: order.shipping_address?.address2 || null,
                 shipping_city: order.shipping_address?.city || null,
                 shipping_province: order.shipping_address?.province || null,
+                shipping_province_code: order.shipping_address?.province_code || null,
                 shipping_zip: order.shipping_address?.zip || null,
                 shipping_country: order.shipping_address?.country || null,
+                shipping_country_code: order.shipping_address?.country_code || null,
                 shipping_phone: order.shipping_address?.phone || null,
-                // Billing address fields
+                shipping_latitude: order.shipping_address?.latitude ? parseFloat(order.shipping_address.latitude) : null,
+                shipping_longitude: order.shipping_address?.longitude ? parseFloat(order.shipping_address.longitude) : null,
+                // Billing address fields (per Shopify API)
+                billing_first_name: order.billing_address?.first_name || null,
+                billing_last_name: order.billing_address?.last_name || null,
                 billing_name: order.billing_address?.name || null,
+                billing_company: order.billing_address?.company || null,
                 billing_address1: order.billing_address?.address1 || null,
                 billing_address2: order.billing_address?.address2 || null,
                 billing_city: order.billing_address?.city || null,
                 billing_province: order.billing_address?.province || null,
+                billing_province_code: order.billing_address?.province_code || null,
                 billing_zip: order.billing_address?.zip || null,
                 billing_country: order.billing_address?.country || null,
-                billing_phone: order.billing_address?.phone || null
+                billing_country_code: order.billing_address?.country_code || null,
+                billing_phone: order.billing_address?.phone || null,
+                billing_latitude: order.billing_address?.latitude ? parseFloat(order.billing_address.latitude) : null,
+                billing_longitude: order.billing_address?.longitude ? parseFloat(order.billing_address.longitude) : null
               })
               .select('id')
               .single()

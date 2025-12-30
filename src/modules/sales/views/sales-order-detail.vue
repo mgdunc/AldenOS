@@ -531,6 +531,7 @@ onMounted(() => fetchOrderData())
                     </div>
                     <div v-if="order.billing_name || order.billing_address1" class="text-900 line-height-3">
                         <div v-if="order.billing_name" class="font-semibold">{{ order.billing_name }}</div>
+                        <div v-if="order.billing_company" class="text-600">{{ order.billing_company }}</div>
                         <div v-if="order.billing_address1">{{ order.billing_address1 }}</div>
                         <div v-if="order.billing_address2">{{ order.billing_address2 }}</div>
                         <div>
@@ -538,7 +539,10 @@ onMounted(() => fetchOrderData())
                             <span v-if="order.billing_province">, {{ order.billing_province }}</span>
                             <span v-if="order.billing_zip"> {{ order.billing_zip }}</span>
                         </div>
-                        <div v-if="order.billing_country">{{ order.billing_country }}</div>
+                        <div v-if="order.billing_country">
+                            {{ order.billing_country }}
+                            <span v-if="order.billing_country_code" class="text-500 text-sm">({{ order.billing_country_code }})</span>
+                        </div>
                         <div v-if="order.billing_phone" class="mt-2 text-600">
                             <i class="pi pi-phone text-xs mr-1"></i>{{ order.billing_phone }}
                         </div>
@@ -556,6 +560,7 @@ onMounted(() => fetchOrderData())
                     </div>
                     <div v-if="order.shipping_name || order.shipping_address1" class="text-900 line-height-3">
                         <div v-if="order.shipping_name" class="font-semibold">{{ order.shipping_name }}</div>
+                        <div v-if="order.shipping_company" class="text-600">{{ order.shipping_company }}</div>
                         <div v-if="order.shipping_address1">{{ order.shipping_address1 }}</div>
                         <div v-if="order.shipping_address2">{{ order.shipping_address2 }}</div>
                         <div>
@@ -563,7 +568,10 @@ onMounted(() => fetchOrderData())
                             <span v-if="order.shipping_province">, {{ order.shipping_province }}</span>
                             <span v-if="order.shipping_zip"> {{ order.shipping_zip }}</span>
                         </div>
-                        <div v-if="order.shipping_country">{{ order.shipping_country }}</div>
+                        <div v-if="order.shipping_country">
+                            {{ order.shipping_country }}
+                            <span v-if="order.shipping_country_code" class="text-500 text-sm">({{ order.shipping_country_code }})</span>
+                        </div>
                         <div v-if="order.shipping_phone" class="mt-2 text-600">
                             <i class="pi pi-phone text-xs mr-1"></i>{{ order.shipping_phone }}
                         </div>
