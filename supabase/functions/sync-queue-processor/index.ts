@@ -1,4 +1,10 @@
 // deno-lint-ignore-file no-explicit-any
+/**
+ * Sync Queue Processor - Single Store Edition
+ * 
+ * Processes pending sync jobs from the queue.
+ * No longer needs integration_id since Shopify credentials are in env vars.
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
@@ -6,19 +12,17 @@ import { getSupabaseEnv } from "../_shared/env.ts"
 import { createLogger } from "../_shared/logger.ts"
 
 const logger = createLogger('sync-queue-processor')
-logger.debug("Sync Queue Processor Started")
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Validate and setup Supabase Client
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
   try {
-    // 1. Fetch pending queue items (priority order)
+    // Fetch pending queue items (priority order)
     const { data: queueItems, error: fetchError } = await supabase
       .from('sync_queue')
       .select('*')
@@ -38,18 +42,19 @@ serve(async (req: Request) => {
 
     await logger.debug(`Found ${queueItems.length} pending sync(s)`)
 
-    // 2. Process each queue item
     const results = []
     
     for (const item of queueItems) {
-      await logger.debug(`Processing ${item.sync_type} for integration ${item.integration_id}`)
+      logger.setContext({ queueId: item.id })
+      await logger.debug(`Processing ${item.sync_type}`)
       
       // Mark as processing
       await supabase
         .from('sync_queue')
         .update({ 
           status: 'processing', 
-          started_at: new Date().toISOString() 
+          started_at: new Date().toISOString(),
+          last_heartbeat: new Date().toISOString()
         })
         .eq('id', item.id)
 
@@ -76,18 +81,16 @@ serve(async (req: Request) => {
       }
 
       try {
-        // Invoke the sync function
+        // Invoke the sync function - no integrationId needed!
         const { data, error } = await supabase.functions.invoke(functionName, {
           body: { 
-            integrationId: item.integration_id,
             queueId: item.id,
-            metadata: item.metadata
+            page_info: item.metadata?.page_info // For pagination continuation
           }
         })
 
         if (error) throw error
 
-        // The sync function will handle updating the queue status when complete
         results.push({
           queue_id: item.id,
           sync_type: item.sync_type,
@@ -98,15 +101,14 @@ serve(async (req: Request) => {
       } catch (error: any) {
         await logger.error(`Error processing ${item.sync_type}`, error)
         
-        // Check if we should retry
-        const shouldRetry = item.retry_count < item.max_retries
+        const shouldRetry = (item.retry_count || 0) < (item.max_retries || 3)
         
         if (shouldRetry) {
           await supabase
             .from('sync_queue')
             .update({ 
               status: 'pending',
-              retry_count: item.retry_count + 1,
+              retry_count: (item.retry_count || 0) + 1,
               error_message: error.message
             })
             .eq('id', item.id)
@@ -115,7 +117,7 @@ serve(async (req: Request) => {
             queue_id: item.id,
             sync_type: item.sync_type,
             status: 'retry_scheduled',
-            retry_count: item.retry_count + 1
+            retry_count: (item.retry_count || 0) + 1
           })
         } else {
           await supabase
@@ -138,26 +140,15 @@ serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ 
-        processed: results.length,
-        results 
-      }),
+      JSON.stringify({ processed: results.length, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
 
   } catch (error: any) {
-    // This catch block ensures CORS headers are returned even on fatal errors
     await logger.error('Processor error', error)
     return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message || 'Internal server error',
-        errorType: 'fatal'
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      }
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   }
 })
