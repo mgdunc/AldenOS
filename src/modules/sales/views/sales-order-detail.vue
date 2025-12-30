@@ -654,14 +654,23 @@ onMounted(() => fetchOrderData())
                 :scrollable="!isMobile"
                 responsiveLayout="scroll"
             >
-                <Column v-if="!isMobile" field="products.sku" header="SKU" style="min-width: 7rem">
+                <Column field="sku" header="SKU" style="min-width: 8rem">
                     <template #body="{ data }">
-                        <router-link v-if="data.products" :to="`/product/${data.products.id}`" class="text-primary font-bold no-underline hover:underline">
-                            {{ data.products.sku }}
+                        <router-link 
+                            v-if="data.product_id" 
+                            :to="`/product/${data.product_id}`" 
+                            class="text-primary font-bold no-underline hover:underline font-mono text-sm"
+                        >
+                            {{ data.sku || data.products?.sku || '-' }}
                         </router-link>
+                        <code v-else class="text-sm text-600">{{ data.sku || '-' }}</code>
                     </template>
                 </Column>
-                <Column field="products.name" header="Product" style="min-width: 10rem" />
+                <Column field="product_name" header="Product" style="min-width: 10rem">
+                    <template #body="{ data }">
+                        {{ data.product_name || data.products?.name || 'Unknown Product' }}
+                    </template>
+                </Column>
                 <Column field="available_now" header="Stock" style="min-width: 7rem">
                      <template #body="{ data }">
                         <div class="flex align-items-center gap-2">
