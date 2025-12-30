@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { formatCurrency } from '@/lib/formatCurrency'
 import { supabase } from '@/lib/supabase'
 import { useInventoryStore } from '../store'
@@ -27,6 +28,7 @@ import Button from 'primevue/button'
 import Toolbar from 'primevue/toolbar'
 import Select from 'primevue/select'
 
+const router = useRouter()
 const store = useInventoryStore()
 const { getProductStats } = useInventory()
 const { isMobile, isTablet } = useResponsive()
@@ -324,7 +326,9 @@ const getStatusSeverity = (status: string) => {
                 @sort="onSort" 
                 dataKey="product_id" 
                 stripedRows
-                class="p-datatable-sm"
+                selectionMode="single"
+                @rowSelect="(e: any) => router.push(`/product/${e.data.product_id}`)"
+                class="p-datatable-sm cursor-pointer"
                 :scrollable="!isMobile"
                 scrollHeight="flex"
                 responsiveLayout="scroll"
@@ -383,7 +387,7 @@ const getStatusSeverity = (status: string) => {
                                 text 
                                 rounded 
                                 severity="secondary"
-                                @click="onAvailableClick(data)"
+                                @click.stop="onAvailableClick(data)"
                                 v-tooltip.top="'View inventory breakdown'"
                             />
                         </div>
@@ -409,7 +413,7 @@ const getStatusSeverity = (status: string) => {
                                 text 
                                 rounded 
                                 severity="warning" 
-                                @click="openReserved(data)"
+                                @click.stop="openReserved(data)"
                                 v-tooltip.top="'View reservations'"
                             />
                         </div>
@@ -429,7 +433,7 @@ const getStatusSeverity = (status: string) => {
                                 text 
                                 rounded 
                                 severity="help" 
-                                @click="openOnOrder(data)"
+                                @click.stop="openOnOrder(data)"
                                 v-tooltip.top="'View purchase orders'"
                             />
                         </div>
@@ -453,7 +457,7 @@ const getStatusSeverity = (status: string) => {
                                 text 
                                 rounded 
                                 severity="danger" 
-                                @click="openDemand(data)"
+                                @click.stop="openDemand(data)"
                                 v-tooltip.top="'View demand details'"
                             />
                         </div>
