@@ -192,7 +192,10 @@ const runQueueItem = async (item: any) => {
     if (updateError) {
       // If it's a column not found error (PostgREST schema cache issue), try without last_heartbeat
       if (updateError.code === 'PGRST204' && updateError.message?.includes('last_heartbeat')) {
-        logger.warn('last_heartbeat column not found in PostgREST schema cache, updating without it. Cache will refresh automatically.', updateError)
+        logger.warn('last_heartbeat column not found in PostgREST schema cache, updating without it. Cache will refresh automatically.', {
+          error: updateError.message,
+          code: updateError.code
+        })
         const { error: retryError } = await supabase
           .from('sync_queue')
           .update({
