@@ -33,7 +33,7 @@ export default defineConfig({
         manualChunks: {
           // Split vendor chunks for better caching
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'primevue': ['primevue', '@primevue/themes', 'primeicons'],
+          'primevue': ['primevue', '@primevue/themes'],
           'supabase': ['@supabase/supabase-js'],
           'pdf': ['jspdf', 'jspdf-autotable'],
           'excel': ['exceljs', 'papaparse'],
