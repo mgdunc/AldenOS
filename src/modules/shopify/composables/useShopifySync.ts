@@ -19,7 +19,7 @@ export interface QueueItem {
 /**
  * Simple Shopify Sync Composable - Single Store Edition
  * 
- * No integration ID needed - uses env vars for Shopify credentials
+ * Automatically fetches the Shopify integration ID from the database
  */
 export function useShopifySync() {
   const toast = useToast()
@@ -27,6 +27,7 @@ export function useShopifySync() {
   const queue = ref<QueueItem[]>([])
   const loading = ref(false)
   const syncing = ref(false)
+  const integrationId = ref<string | null>(null)
   
   let channel: any = null
 
@@ -35,6 +36,24 @@ export function useShopifySync() {
       item.status === 'pending' || item.status === 'processing'
     )
   })
+
+  // Fetch the Shopify integration ID
+  const loadIntegrationId = async () => {
+    try {
+      const { data } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('provider', 'shopify')
+        .limit(1)
+        .maybeSingle()
+      
+      if (data) {
+        integrationId.value = data.id
+      }
+    } catch (e) {
+      logger.error('Failed to load integration ID', e as Error)
+    }
+  }
 
   const loadQueue = async () => {
     loading.value = true
@@ -65,12 +84,27 @@ export function useShopifySync() {
       return
     }
 
+    // Ensure we have an integration ID
+    if (!integrationId.value) {
+      await loadIntegrationId()
+    }
+    
+    if (!integrationId.value) {
+      toast.add({
+        severity: 'error',
+        summary: 'Not Configured',
+        detail: 'Please configure Shopify integration first'
+      })
+      return
+    }
+
     syncing.value = true
     try {
-      // Create queue entry
+      // Create queue entry with integration_id
       const { data: queueItem, error: queueError } = await supabase
         .from('sync_queue')
         .insert({
+          integration_id: integrationId.value,
           sync_type: type,
           status: 'pending',
           priority: type === 'order_sync' ? 1 : 2 // Orders first
@@ -124,6 +158,7 @@ export function useShopifySync() {
   }
 
   onMounted(() => {
+    loadIntegrationId()
     loadQueue()
     subscribe()
   })
