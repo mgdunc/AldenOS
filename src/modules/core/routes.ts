@@ -21,5 +21,10 @@ export const routes = [
     path: '/dev/logs',
     name: 'system-logs',
     component: () => import('./views/system-logs.vue')
+  },
+  {
+    path: '/dev/diagnostics',
+    name: 'diagnostics',
+    component: () => import('./views/diagnostics.vue')
   }
 ]
