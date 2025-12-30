@@ -349,10 +349,65 @@ const processAllPending = async () => {
       detail: `Processing ${pendingCount} pending item(s)...`
     })
 
-    // Invoke the queue processor
-    const { data, error } = await supabase.functions.invoke('sync-queue-processor', {})
+    // Invoke the queue processor with retry logic for network errors
+    let response
+    let lastError: any = null
+    const maxRetries = 2
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        response = await supabase.functions.invoke('sync-queue-processor', {})
+        lastError = null
+        break
+      } catch (retryError: any) {
+        lastError = retryError
+        const isNetworkError = 
+          retryError?.name === 'FunctionsFetchError' ||
+          retryError?.message?.toLowerCase().includes('failed to send') ||
+          retryError?.message?.toLowerCase().includes('network') ||
+          retryError?.message?.toLowerCase().includes('fetch failed')
+        
+        if (isNetworkError && attempt < maxRetries) {
+          logger.warn(`Network error on attempt ${attempt + 1}/${maxRetries + 1}, retrying...`, {
+            functionName: 'sync-queue-processor',
+            attempt: attempt + 1,
+            error: retryError.message
+          })
+          await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000))
+          continue
+        } else {
+          throw retryError
+        }
+      }
+    }
+    
+    if (lastError) {
+      throw lastError
+    }
+    
+    if (!response) {
+      throw new Error('Failed to get response from Edge Function after retries')
+    }
+    
+    const { data, error } = response
 
-    if (error) throw error
+    if (error) {
+      const errorName = error.name || ''
+      const errorMsg = error.message?.toLowerCase() || ''
+      
+      if (
+        errorName === 'FunctionsFetchError' ||
+        errorMsg.includes('failed to send a request') ||
+        errorMsg.includes('fetch failed') ||
+        errorMsg.includes('network error')
+      ) {
+        throw new Error(
+          `Network error: Unable to reach queue processor. ` +
+          `Please check your internet connection and try again.`
+        )
+      }
+      throw error
+    }
 
     toast.add({
       severity: 'success',
