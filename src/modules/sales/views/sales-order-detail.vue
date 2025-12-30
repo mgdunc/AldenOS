@@ -425,9 +425,10 @@ onMounted(() => fetchOrderData())
     <div v-else-if="order" class="flex flex-column gap-4 max-w-7xl mx-auto w-full">
         
         <!-- Header Section -->
-        <div class="surface-card p-4 shadow-2 border-round sticky top-0 z-5">
+        <div class="surface-card p-4 shadow-2 border-round">
             <div class="flex flex-column md:flex-row justify-content-between align-items-start md:align-items-center gap-3 mb-4">
                 <div class="flex align-items-center gap-3">
+                    <Button icon="pi pi-arrow-left" text rounded @click="router.push('/sales')" v-tooltip="'Back to Orders'" />
                     <h1 class="text-3xl font-bold m-0 text-900">{{ order.order_number }}</h1>
                     <Tag :value="order.status?.toUpperCase().replace('_', ' ')" :severity="getStatusSeverity(order.status)" class="text-sm font-bold px-3 py-1" />
                 </div>
@@ -443,7 +444,7 @@ onMounted(() => fetchOrderData())
                         class="flex-1 md:flex-none"
                     />
                     
-                    <template v-if="order.status === 'draft'">
+                    <template v-if="order.status === 'draft' || order.status === 'new'">
                         <Button 
                             v-if="lines.length > 0"
                             label="Confirm Order" 
@@ -497,7 +498,7 @@ onMounted(() => fetchOrderData())
                 <div class="col-12 md:col-4">
                     <div class="surface-50 p-3 border-round h-full">
                         <span class="text-500 text-sm font-medium block mb-2">Customer</span>
-                        <div class="text-xl font-bold text-900">{{ order.customer_name }}</div>
+                        <div class="text-xl font-bold text-900">{{ order.customer_name || 'No Customer' }}</div>
                     </div>
                 </div>
                 <div class="col-12 md:col-4">
@@ -516,20 +517,74 @@ onMounted(() => fetchOrderData())
                     </div>
                 </div>
             </div>
-            
-            <!-- Address Section -->
-            <div class="grid mt-2">
-                <div class="col-12 md:col-6">
-                    <div class="surface-50 p-3 border-round h-full">
-                        <span class="text-500 text-sm font-medium block mb-2">Billing Address</span>
-                        <Textarea v-model="order.billing_address" rows="3" class="w-full text-sm" autoResize @blur="updateOrder" placeholder="Enter billing address..." />
+        </div>
+
+        <!-- Address Section - Separate Card -->
+        <div class="grid">
+            <div class="col-12 md:col-6">
+                <div class="surface-card shadow-2 border-round p-4 h-full">
+                    <div class="flex align-items-center justify-content-between mb-3">
+                        <span class="text-600 font-semibold flex align-items-center gap-2">
+                            <i class="pi pi-file-edit"></i>
+                            Billing Address
+                        </span>
                     </div>
+                    <div v-if="order.billing_address && typeof order.billing_address === 'object'" class="text-900 line-height-3">
+                        <div v-if="order.billing_address.name" class="font-semibold">{{ order.billing_address.name }}</div>
+                        <div v-if="order.billing_address.address1">{{ order.billing_address.address1 }}</div>
+                        <div v-if="order.billing_address.address2">{{ order.billing_address.address2 }}</div>
+                        <div>
+                            <span v-if="order.billing_address.city">{{ order.billing_address.city }}</span>
+                            <span v-if="order.billing_address.province">, {{ order.billing_address.province }}</span>
+                            <span v-if="order.billing_address.zip"> {{ order.billing_address.zip }}</span>
+                        </div>
+                        <div v-if="order.billing_address.country">{{ order.billing_address.country }}</div>
+                        <div v-if="order.billing_address.phone" class="mt-2 text-600">
+                            <i class="pi pi-phone text-xs mr-1"></i>{{ order.billing_address.phone }}
+                        </div>
+                    </div>
+                    <Textarea 
+                        v-else 
+                        v-model="order.billing_address" 
+                        rows="4" 
+                        class="w-full" 
+                        autoResize 
+                        @blur="updateOrder" 
+                        placeholder="Enter billing address..." 
+                    />
                 </div>
-                <div class="col-12 md:col-6">
-                    <div class="surface-50 p-3 border-round h-full">
-                        <span class="text-500 text-sm font-medium block mb-2">Shipping Address</span>
-                        <Textarea v-model="order.shipping_address" rows="3" class="w-full text-sm" autoResize @blur="updateOrder" placeholder="Enter shipping address..." />
+            </div>
+            <div class="col-12 md:col-6">
+                <div class="surface-card shadow-2 border-round p-4 h-full">
+                    <div class="flex align-items-center justify-content-between mb-3">
+                        <span class="text-600 font-semibold flex align-items-center gap-2">
+                            <i class="pi pi-truck"></i>
+                            Shipping Address
+                        </span>
                     </div>
+                    <div v-if="order.shipping_address && typeof order.shipping_address === 'object'" class="text-900 line-height-3">
+                        <div v-if="order.shipping_address.name" class="font-semibold">{{ order.shipping_address.name }}</div>
+                        <div v-if="order.shipping_address.address1">{{ order.shipping_address.address1 }}</div>
+                        <div v-if="order.shipping_address.address2">{{ order.shipping_address.address2 }}</div>
+                        <div>
+                            <span v-if="order.shipping_address.city">{{ order.shipping_address.city }}</span>
+                            <span v-if="order.shipping_address.province">, {{ order.shipping_address.province }}</span>
+                            <span v-if="order.shipping_address.zip"> {{ order.shipping_address.zip }}</span>
+                        </div>
+                        <div v-if="order.shipping_address.country">{{ order.shipping_address.country }}</div>
+                        <div v-if="order.shipping_address.phone" class="mt-2 text-600">
+                            <i class="pi pi-phone text-xs mr-1"></i>{{ order.shipping_address.phone }}
+                        </div>
+                    </div>
+                    <Textarea 
+                        v-else 
+                        v-model="order.shipping_address" 
+                        rows="4" 
+                        class="w-full" 
+                        autoResize 
+                        @blur="updateOrder" 
+                        placeholder="Enter shipping address..." 
+                    />
                 </div>
             </div>
         </div>
