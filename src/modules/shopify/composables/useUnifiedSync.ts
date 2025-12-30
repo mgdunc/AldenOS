@@ -361,6 +361,11 @@ export function useUnifiedSync(integrationId: string) {
         throw lastError
       }
       
+      // Response should be defined at this point, but check for safety
+      if (!response) {
+        throw new Error('Failed to get response from Edge Function after retries')
+      }
+      
       const { data, error } = response
       
       // IMPORTANT: Check data FIRST, even if error exists
