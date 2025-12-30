@@ -316,13 +316,50 @@ export function useUnifiedSync(integrationId: string) {
     const functionName = getFunctionName(type)
     
     try {
-      // Invoke Edge Function
-      const response = await supabase.functions.invoke(functionName, {
-        body: {
-          integrationId,
-          queueId: queueEntry.id
+      // Invoke Edge Function with retry logic for network errors
+      let response
+      let lastError: any = null
+      const maxRetries = 2
+      
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          response = await supabase.functions.invoke(functionName, {
+            body: {
+              integrationId,
+              queueId: queueEntry.id
+            }
+          })
+          lastError = null
+          break // Success, exit retry loop
+        } catch (retryError: any) {
+          lastError = retryError
+          const isNetworkError = 
+            retryError?.name === 'FunctionsFetchError' ||
+            retryError?.message?.toLowerCase().includes('failed to send') ||
+            retryError?.message?.toLowerCase().includes('network') ||
+            retryError?.message?.toLowerCase().includes('fetch failed')
+          
+          // Only retry on network errors, not on application errors
+          if (isNetworkError && attempt < maxRetries) {
+            logger.warn(`Network error on attempt ${attempt + 1}/${maxRetries + 1}, retrying...`, {
+              functionName,
+              attempt: attempt + 1,
+              error: retryError.message
+            })
+            // Wait before retry (exponential backoff: 1s, 2s)
+            await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000))
+            continue
+          } else {
+            // Not a network error or max retries reached, throw
+            throw retryError
+          }
         }
-      })
+      }
+      
+      // If we still have an error after retries, throw it
+      if (lastError) {
+        throw lastError
+      }
       
       const { data, error } = response
       
@@ -354,10 +391,57 @@ export function useUnifiedSync(integrationId: string) {
       }
       
       if (error) {
-        // Check if function doesn't exist (404 or specific error messages)
+        // Check for network/connectivity errors (FunctionsFetchError)
+        const errorName = error.name || ''
         const errorMsg = error.message?.toLowerCase() || ''
         const errorStatus = error.status
         
+        if (
+          errorName === 'FunctionsFetchError' ||
+          errorMsg.includes('failed to send a request') ||
+          errorMsg.includes('fetch failed') ||
+          errorMsg.includes('network error') ||
+          errorMsg.includes('connection') ||
+          errorMsg.includes('timeout')
+        ) {
+          const detailedError = new Error(
+            `Network error: Unable to reach Edge Function '${functionName}'. ` +
+            `This may be due to network connectivity issues, CORS problems, or the function endpoint being unreachable. ` +
+            `Please check your internet connection and try again.`
+          )
+          ;(detailedError as any).originalError = error
+          ;(detailedError as any).functionName = functionName
+          ;(detailedError as any).status = errorStatus
+          ;(detailedError as any).errorType = 'network'
+          
+          logger.error(`Network error calling Edge Function '${functionName}'`, detailedError, {
+            integrationId,
+            syncType: type,
+            functionName,
+            queueId: queueEntry.id,
+            errorName: error.name,
+            errorMessage: error.message,
+            suggestion: 'Check network connectivity, CORS settings, and Supabase project configuration. The function may be temporarily unavailable.',
+            troubleshooting: [
+              'Verify internet connection',
+              'Check if Supabase project is accessible',
+              'Verify Edge Function is deployed',
+              'Check browser console for CORS errors',
+              'Try refreshing the page and retrying'
+            ]
+          })
+          
+          toast.add({
+            severity: 'error',
+            summary: 'Network Error',
+            detail: `Unable to reach sync function. Please check your connection and try again.`,
+            life: 5000
+          })
+          
+          throw detailedError
+        }
+        
+        // Check if function doesn't exist (404 or specific error messages)
         if (
           errorStatus === 404 || 
           errorMsg.includes('not found') || 
