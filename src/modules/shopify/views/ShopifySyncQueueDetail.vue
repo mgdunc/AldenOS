@@ -8,9 +8,9 @@ import { logger } from '@/lib/logger'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
-import Timeline from 'primevue/timeline'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Dialog from 'primevue/dialog'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +19,8 @@ const toast = useToast()
 const queueItem = ref<any>(null)
 const logs = ref<any[]>([])
 const loading = ref(true)
+const showLogDialog = ref(false)
+const selectedLog = ref<any>(null)
 let channel: RealtimeChannel | null = null
 
 const queueId = computed(() => route.params.id as string)
@@ -51,17 +53,35 @@ const loadQueueItem = async () => {
 
 const loadLogs = async () => {
   try {
+    // Load logs from system_logs where source is EdgeFunction and timestamp is after queue creation
+    // Also filter by queueId in details if available
     const { data, error } = await supabase
-      .from('integration_logs')
+      .from('system_logs')
       .select('*')
-      .eq('integration_id', queueItem.value?.integration_id)
+      .or(`source.ilike.EdgeFunction:%,details->integrationId.eq.${queueItem.value?.integration_id},details->queueId.eq.${queueItem.value?.id}`)
       .gte('created_at', queueItem.value?.created_at)
       .order('created_at', { ascending: true })
+      .limit(100)
 
     if (error) throw error
-    logs.value = data || []
+    
+    // Filter to only show logs relevant to this sync (by queueId or integrationId in details)
+    const filteredLogs = (data || []).filter(log => {
+      const details = log.details || {}
+      // Match if queueId matches
+      if (details.queueId === queueItem.value?.id) return true
+      // Match if integrationId matches and it's an EdgeFunction log
+      if (details.integrationId === queueItem.value?.integration_id && log.source?.startsWith('EdgeFunction:')) return true
+      // Match if functionName matches the sync type
+      const syncType = queueItem.value?.sync_type
+      if (syncType === 'product_sync' && details.functionName === 'shopify-product-sync') return true
+      if (syncType === 'order_sync' && details.functionName === 'shopify-order-sync') return true
+      return false
+    })
+    
+    logs.value = filteredLogs
   } catch (error: any) {
-      logger.error('Error loading logs:', error)
+    logger.error('Error loading logs:', error)
   }
 }
 
@@ -85,10 +105,10 @@ const subscribeToUpdates = () => {
       {
         event: 'INSERT',
         schema: 'public',
-        table: 'integration_logs',
-        filter: `integration_id=eq.${queueItem.value?.integration_id}`
+        table: 'system_logs'
       },
       () => {
+        // Reload logs when new system_logs are inserted
         loadLogs()
       }
     )
@@ -178,6 +198,36 @@ const retrySync = async () => {
       severity: 'error',
       summary: 'Error',
       detail: 'Failed to retry sync'
+    })
+  }
+}
+
+const copyLogToClipboard = async () => {
+  if (!selectedLog.value) return
+  
+  const logText = `Log Entry
+==========
+Timestamp: ${formatDate(selectedLog.value.created_at)}
+Level: ${selectedLog.value.level}
+Source: ${selectedLog.value.source}
+Message: ${selectedLog.value.message}
+
+Details:
+${JSON.stringify(selectedLog.value.details, null, 2)}`
+
+  try {
+    await navigator.clipboard.writeText(logText)
+    toast.add({
+      severity: 'success',
+      summary: 'Copied',
+      detail: 'Log copied to clipboard',
+      life: 2000
+    })
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to copy to clipboard'
     })
   }
 }
@@ -382,10 +432,20 @@ onUnmounted(() => {
       <div class="col-12">
         <Card>
           <template #title>
-            <div class="flex align-items-center gap-2">
-              <i class="pi pi-file-edit text-primary"></i>
-              <span>Integration Logs</span>
-              <Tag :value="logs.length.toString()" severity="secondary" class="text-xs" />
+            <div class="flex align-items-center justify-content-between">
+              <div class="flex align-items-center gap-2">
+                <i class="pi pi-file-edit text-primary"></i>
+                <span>Edge Function Logs</span>
+                <Tag :value="logs.length.toString()" severity="secondary" class="text-xs" />
+              </div>
+              <Button 
+                icon="pi pi-refresh" 
+                text 
+                rounded 
+                size="small"
+                @click="loadLogs"
+                v-tooltip="'Refresh Logs'"
+              />
             </div>
           </template>
           <template #content>
@@ -399,19 +459,26 @@ onUnmounted(() => {
               <template #empty>
                 <div class="text-center text-500 py-4">
                   <i class="pi pi-inbox text-4xl mb-3 block text-300"></i>
-                  <div>No logs found for this sync</div>
+                  <div>No Edge Function logs found for this sync</div>
+                  <div class="text-sm mt-2">Logs will appear here when the sync runs</div>
                 </div>
               </template>
 
-              <Column field="created_at" header="Timestamp" style="width: 180px">
+              <Column field="created_at" header="Timestamp" style="width: 160px">
                 <template #body="{ data }">
                   <span class="text-sm">{{ formatDate(data.created_at) }}</span>
                 </template>
               </Column>
 
-              <Column field="level" header="Level" style="width: 100px">
+              <Column field="level" header="Level" style="width: 80px">
                 <template #body="{ data }">
                   <Tag :value="data.level" :severity="getLogSeverity(data.level)" class="text-xs" />
+                </template>
+              </Column>
+
+              <Column field="source" header="Source" style="width: 150px">
+                <template #body="{ data }">
+                  <span class="text-sm text-600">{{ data.source?.replace('EdgeFunction:', '') || '-' }}</span>
                 </template>
               </Column>
 
@@ -421,7 +488,7 @@ onUnmounted(() => {
                 </template>
               </Column>
 
-              <Column field="details" header="Details" style="width: 100px">
+              <Column field="details" header="" style="width: 60px">
                 <template #body="{ data }">
                   <Button 
                     v-if="data.details"
@@ -429,14 +496,7 @@ onUnmounted(() => {
                     text
                     rounded
                     size="small"
-                    @click="() => {
-                      toast.add({
-                        severity: 'info',
-                        summary: 'Log Details',
-                        detail: JSON.stringify(data.details, null, 2),
-                        life: 10000
-                      })
-                    }"
+                    @click="selectedLog = data; showLogDialog = true"
                     v-tooltip="'View Details'"
                   />
                 </template>
@@ -446,6 +506,40 @@ onUnmounted(() => {
         </Card>
       </div>
     </div>
+
+    <!-- Log Details Dialog -->
+    <Dialog 
+      v-model:visible="showLogDialog" 
+      header="Log Details" 
+      :modal="true" 
+      :style="{ width: '600px', maxHeight: '80vh' }"
+      class="log-details-dialog"
+    >
+      <div v-if="selectedLog" class="flex flex-column gap-3">
+        <div class="flex align-items-center gap-2">
+          <Tag :value="selectedLog.level" :severity="getLogSeverity(selectedLog.level)" />
+          <span class="text-600">{{ selectedLog.source }}</span>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-600 mb-1">Message</label>
+          <div class="surface-100 border-round p-2">{{ selectedLog.message }}</div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-600 mb-1">Timestamp</label>
+          <div>{{ formatDate(selectedLog.created_at) }}</div>
+        </div>
+        <div v-if="selectedLog.details">
+          <label class="block text-sm font-semibold text-600 mb-1">Details</label>
+          <div class="surface-100 border-round p-3 overflow-auto" style="max-height: 300px">
+            <pre class="m-0 text-sm white-space-pre-wrap">{{ JSON.stringify(selectedLog.details, null, 2) }}</pre>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Copy" icon="pi pi-copy" text @click="copyLogToClipboard" />
+        <Button label="Close" @click="showLogDialog = false" />
+      </template>
+    </Dialog>
 
     <div v-else class="text-center text-500 py-8">
       <i class="pi pi-exclamation-triangle text-4xl mb-3 block text-orange-500"></i>

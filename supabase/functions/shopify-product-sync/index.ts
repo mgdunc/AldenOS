@@ -35,8 +35,10 @@ serve(async (req: Request) => {
     page_info = body.page_info
     queueId = body.queueId
     
-    logger.debug(` Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
-    logger.debug(` Full body:`, JSON.stringify(body))
+    // Set context for all subsequent logs
+    logger.setContext({ integrationId, queueId, jobId })
+    
+    logger.debug(`Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
   } catch (e: any) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), { 
       status: 400,

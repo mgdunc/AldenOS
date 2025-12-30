@@ -19,12 +19,35 @@ export class EdgeLogger {
   private supabaseUrl: string
   private supabaseKey: string
   private source: string
+  private syncContext: LogContext = {}
 
   constructor(source: string) {
     this.source = source
     // These are automatically available in Edge Functions
     this.supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
     this.supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  }
+
+  /**
+   * Set context that will be included in all subsequent logs
+   * Useful for adding integrationId, queueId, etc.
+   */
+  setContext(context: LogContext): void {
+    this.syncContext = { ...this.syncContext, ...context }
+  }
+
+  /**
+   * Clear the sync context
+   */
+  clearContext(): void {
+    this.syncContext = {}
+  }
+
+  /**
+   * Get merged context with sync context
+   */
+  private mergeContext(context?: LogContext): LogContext {
+    return { ...this.syncContext, ...context }
   }
 
   private async writeToDatabase(
@@ -78,10 +101,11 @@ export class EdgeLogger {
    * Log an info message
    */
   info(message: string, context?: LogContext): void {
-    console.log(`[INFO][${this.source}] ${message}`, context || '')
-    // Only write INFO to DB if it seems important (has context)
-    if (context) {
-      this.writeToDatabase('INFO', message, context)
+    const mergedContext = this.mergeContext(context)
+    console.log(`[INFO][${this.source}] ${message}`, mergedContext)
+    // Only write INFO to DB if it seems important (has context or syncContext)
+    if (context || Object.keys(this.syncContext).length > 0) {
+      this.writeToDatabase('INFO', message, mergedContext)
     }
   }
 
@@ -89,30 +113,31 @@ export class EdgeLogger {
    * Log a warning message (always writes to DB)
    */
   warn(message: string, context?: LogContext): void {
-    console.warn(`[WARN][${this.source}] ${message}`, context || '')
-    this.writeToDatabase('WARN', message, context)
+    const mergedContext = this.mergeContext(context)
+    console.warn(`[WARN][${this.source}] ${message}`, mergedContext)
+    this.writeToDatabase('WARN', message, mergedContext)
   }
 
   /**
    * Log an error message (always writes to DB)
    */
   error(message: string, error?: Error | unknown, context?: LogContext): void {
-    const errorDetails: LogContext = { ...context }
+    const mergedContext = this.mergeContext(context)
     
     if (error) {
       if (error instanceof Error) {
-        errorDetails.errorName = error.name
-        errorDetails.errorMessage = error.message
-        errorDetails.errorStack = error.stack
+        mergedContext.errorName = error.name
+        mergedContext.errorMessage = error.message
+        mergedContext.errorStack = error.stack
       } else if (typeof error === 'object') {
-        errorDetails.errorObject = error
+        mergedContext.errorObject = error
       } else {
-        errorDetails.error = String(error)
+        mergedContext.error = String(error)
       }
     }
 
-    console.error(`[ERROR][${this.source}] ${message}`, error || '', context || '')
-    this.writeToDatabase('ERROR', message, errorDetails)
+    console.error(`[ERROR][${this.source}] ${message}`, error || '', mergedContext)
+    this.writeToDatabase('ERROR', message, mergedContext)
   }
 
   /**
