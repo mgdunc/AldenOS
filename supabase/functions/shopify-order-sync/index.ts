@@ -461,7 +461,7 @@ serve(async (req: Request) => {
         await supabase.from('integration_sync_jobs').update({
           processed_items: currentProcessed + processedCount,
           matched_items: currentMatched + matchedCount,
-          updated_items: (currentJob?.updated_items || 0) + skippedCount,
+          updated_items: (currentJob?.updated_items || 0) + updatedCount,
           error_count: currentErrors + errorCount,
           updated_at: new Date().toISOString()
         }).eq('id', jobId)
