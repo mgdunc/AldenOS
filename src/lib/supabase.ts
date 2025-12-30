@@ -11,4 +11,19 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   )
 }
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_KEY)
+// Create Supabase client with explicit configuration for Edge Functions
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  },
+  global: {
+    headers: {
+      'apikey': SUPABASE_KEY
+    }
+  }
+})
+
+// Store URL for diagnostics (non-sensitive, just for logging)
+;(supabase as any).supabaseUrl = SUPABASE_URL

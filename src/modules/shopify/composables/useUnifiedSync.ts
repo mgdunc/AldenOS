@@ -323,6 +323,17 @@ export function useUnifiedSync(integrationId: string) {
       
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
+          // Log diagnostic info on first attempt
+          if (attempt === 0) {
+            const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL
+            logger.debug('Invoking Edge Function', {
+              functionName,
+              supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'not available',
+              integrationId,
+              queueId: queueEntry.id
+            })
+          }
+          
           response = await supabase.functions.invoke(functionName, {
             body: {
               integrationId,
@@ -344,7 +355,9 @@ export function useUnifiedSync(integrationId: string) {
             logger.warn(`Network error on attempt ${attempt + 1}/${maxRetries + 1}, retrying...`, {
               functionName,
               attempt: attempt + 1,
-              error: retryError.message
+              error: retryError.message,
+              errorName: retryError.name,
+              errorContext: retryError.context
             })
             // Wait before retry (exponential backoff: 1s, 2s)
             await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000))
