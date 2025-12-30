@@ -98,30 +98,30 @@ export class EdgeLogger {
   }
 
   /**
-   * Log an info message
+   * Log an info message (async - awaits DB write)
    */
-  info(message: string, context?: LogContext): void {
+  async info(message: string, context?: LogContext): Promise<void> {
     const mergedContext = this.mergeContext(context)
     console.log(`[INFO][${this.source}] ${message}`, mergedContext)
     // Only write INFO to DB if it seems important (has context or syncContext)
     if (context || Object.keys(this.syncContext).length > 0) {
-      this.writeToDatabase('INFO', message, mergedContext)
+      await this.writeToDatabase('INFO', message, mergedContext)
     }
   }
 
   /**
-   * Log a warning message (always writes to DB)
+   * Log a warning message (async - awaits DB write)
    */
-  warn(message: string, context?: LogContext): void {
+  async warn(message: string, context?: LogContext): Promise<void> {
     const mergedContext = this.mergeContext(context)
     console.warn(`[WARN][${this.source}] ${message}`, mergedContext)
-    this.writeToDatabase('WARN', message, mergedContext)
+    await this.writeToDatabase('WARN', message, mergedContext)
   }
 
   /**
-   * Log an error message (always writes to DB)
+   * Log an error message (async - awaits DB write)
    */
-  error(message: string, error?: Error | unknown, context?: LogContext): void {
+  async error(message: string, error?: Error | unknown, context?: LogContext): Promise<void> {
     const mergedContext = this.mergeContext(context)
     
     if (error) {
@@ -137,7 +137,7 @@ export class EdgeLogger {
     }
 
     console.error(`[ERROR][${this.source}] ${message}`, error || '', mergedContext)
-    this.writeToDatabase('ERROR', message, mergedContext)
+    await this.writeToDatabase('ERROR', message, mergedContext)
   }
 
   /**

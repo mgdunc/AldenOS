@@ -39,6 +39,7 @@ serve(async (req: Request) => {
     logger.setContext({ integrationId, queueId, jobId })
     
     logger.debug(`Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
+    await logger.info('Product sync started', { integrationId, queueId })
   } catch (e: any) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), { 
       status: 400,
@@ -48,7 +49,7 @@ serve(async (req: Request) => {
 
   // Validate integrationId before starting background task
   if (!integrationId) {
-    logger.error(' ERROR: integrationId is missing from request')
+    await logger.error('ERROR: integrationId is missing from request')
     return new Response(
       JSON.stringify({ error: "Integration ID is required" }),
       { 
@@ -166,7 +167,7 @@ serve(async (req: Request) => {
           .single()
         
         if (jobError) {
-          logger.error(' Failed to create job:', jobError)
+          await logger.error('Failed to create job', jobError)
           await log(`Failed to create sync job: ${jobError.message}`, "error")
         } else {
           jobId = newJob.id
@@ -335,7 +336,7 @@ serve(async (req: Request) => {
                 .upsert(integrationUpserts, { onConflict: 'product_id, integration_id' })
             
             if (linkError) {
-                logger.error(' Error linking products:', linkError)
+                await logger.error('Error linking products', linkError)
                 await log(`Error linking products: ${linkError.message}`, "error")
             } else {
                 await log(`Linked ${integrationUpserts.length} products`, "info")
@@ -349,7 +350,7 @@ serve(async (req: Request) => {
                 .upsert(unmatchedBatch, { onConflict: 'integration_id, external_variant_id' })
             
             if (unmatchedError) {
-                logger.error(' Error inserting unmatched products:', unmatchedError)
+                await logger.error('Error inserting unmatched products', unmatchedError)
                 await log(`Error recording unmatched products: ${unmatchedError.message}`, "error")
             } else {
                 await log(`Recorded ${unmatchedBatch.length} unmatched products`, "info")
@@ -395,11 +396,12 @@ serve(async (req: Request) => {
           }
           
           await log(`Sync Complete.`, "success")
+          await logger.info('Product sync complete', { processedCount, matchedCount: result?.matched || 0 })
           return { success: true, nextPageInfo: null, jobId, message: "Sync Complete" }
       }
 
     } catch (error: any) {
-      logger.error(' Error in sync process:', error)
+      await logger.error('Error in sync process', error)
       
       // Classify the error
       const classifyError = (err: any): 'retryable' | 'permanent' | 'unknown' => {
@@ -475,7 +477,7 @@ serve(async (req: Request) => {
   )
   } catch (fatalError: any) {
     // This catch block ensures CORS headers are returned even on fatal errors
-    logger.error(' Fatal error:', fatalError.message || fatalError)
+    await logger.error('Fatal error', fatalError)
     return new Response(
       JSON.stringify({ 
         success: false, 

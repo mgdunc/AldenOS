@@ -37,6 +37,7 @@ serve(async (req: Request) => {
       logger.setContext({ integrationId, queueId, jobId })
       
       logger.debug(`Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
+      await logger.info('Order sync started', { integrationId, queueId })
     } catch (_e: any) {
       return new Response(JSON.stringify({ error: "Invalid request body" }), { 
         status: 400,
@@ -46,7 +47,7 @@ serve(async (req: Request) => {
 
     // Validate integrationId
     if (!integrationId) {
-      logger.error(' ERROR: integrationId is missing from request')
+      await logger.error('ERROR: integrationId is missing from request')
       return new Response(
         JSON.stringify({ error: "Integration ID is required" }),
         { 
@@ -128,7 +129,7 @@ serve(async (req: Request) => {
           .single()
         
         if (jobError) {
-          logger.error(' Failed to create job:', jobError)
+          await logger.error('Failed to create job', jobError)
           await log(`Failed to create sync job: ${jobError.message}`, "error")
         } else {
           jobId = newJob.id
@@ -403,7 +404,7 @@ serve(async (req: Request) => {
         }
 
         await log(`Order sync completed. Created: ${createdCount}, Matched: ${matchedCount}, Errors: ${errorCount}`, "success")
-        logger.debug(` Sync complete!`)
+        await logger.info(`Sync complete!`, { createdCount, matchedCount, errorCount, processedCount })
         
         return { 
           success: true, 
@@ -421,7 +422,7 @@ serve(async (req: Request) => {
       }
 
     } catch (error: any) {
-      console.error(`[ORDER_SYNC] Fatal error:`, error)
+      await logger.error(`Fatal sync error`, error, { jobId, queueId })
       
       // Update job status to failed
       if (jobId) {
@@ -468,7 +469,7 @@ serve(async (req: Request) => {
   )
   } catch (fatalError: any) {
     // This catch block ensures CORS headers are returned even on fatal errors
-    logger.error(' Fatal error:', fatalError.message || fatalError)
+    await logger.error('Fatal error', fatalError)
     return new Response(
       JSON.stringify({ 
         success: false, 

@@ -63,7 +63,7 @@ serve(async (req: Request) => {
           functionName = 'shopify-order-sync'
           break
         default:
-          logger.error(`Unknown sync type: ${item.sync_type}`)
+          await logger.error(`Unknown sync type: ${item.sync_type}`)
           await supabase
             .from('sync_queue')
             .update({ 
@@ -96,7 +96,7 @@ serve(async (req: Request) => {
         })
 
       } catch (error: any) {
-        logger.error(`Error processing ${item.sync_type}`, error)
+        await logger.error(`Error processing ${item.sync_type}`, error)
         
         // Check if we should retry
         const shouldRetry = item.retry_count < item.max_retries
@@ -147,7 +147,7 @@ serve(async (req: Request) => {
 
   } catch (error: any) {
     // This catch block ensures CORS headers are returned even on fatal errors
-    logger.error('Processor error', error)
+    await logger.error('Processor error', error)
     return new Response(
       JSON.stringify({ 
         success: false,
