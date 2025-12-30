@@ -36,7 +36,7 @@ serve(async (req: Request) => {
       // Set context for all subsequent logs
       logger.setContext({ integrationId, queueId, jobId })
       
-      logger.debug(`Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
+      await logger.debug(`Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
       await logger.info('Order sync started', { integrationId, queueId })
     } catch (_e: any) {
       return new Response(JSON.stringify({ error: "Invalid request body" }), { 
@@ -85,7 +85,7 @@ serve(async (req: Request) => {
           .maybeSingle()
         
         if (existingSync) {
-          logger.debug(` Another sync already processing for integration ${integrationId}`)
+          await logger.debug(`Another sync already processing for integration ${integrationId}`)
           return { success: false, error: 'Another sync is already in progress for this integration' }
         }
       }
@@ -133,7 +133,7 @@ serve(async (req: Request) => {
           await log(`Failed to create sync job: ${jobError.message}`, "error")
         } else {
           jobId = newJob.id
-          logger.debug(` Created new job ${jobId}`)
+          await logger.debug(`Created new job ${jobId}`)
         }
       }
 
@@ -144,7 +144,7 @@ serve(async (req: Request) => {
           started_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }).eq('id', jobId)
-        logger.debug(` Job ${jobId} marked as running`)
+        await logger.debug(`Job ${jobId} marked as running`)
         await log("Starting order sync...", "info")
       }
 
@@ -169,18 +169,18 @@ serve(async (req: Request) => {
               updated_at: new Date().toISOString()
             }).eq('id', jobId)
           }
-          logger.debug(` Total orders: ${count}`)
+          await logger.debug(`Total orders: ${count}`)
         } catch (e) {
           logger.warn(' Could not get total count:', e)
         }
       }
 
       // Fetch one page of orders
-      logger.debug(` Fetching orders page...`)
+      await logger.debug(`Fetching orders page...`)
       await updateHeartbeat()
       
       const { orders, nextPageInfo } = await shopify.getOrdersPage(50, page_info, 'any')
-      logger.debug(` Fetched ${orders.length} orders`)
+      await logger.debug(`Fetched ${orders.length} orders`)
 
       let processedCount = 0
       let matchedCount = 0
@@ -202,7 +202,7 @@ serve(async (req: Request) => {
             // Order exists - skip
             matchedCount++
             skippedCount++
-            logger.debug(` Order #${order.order_number} already exists as ${existingOrder.id}`)
+            await logger.debug(`Order #${order.order_number} already exists`, { orderId: existingOrder.id })
           } else {
             // Create new order
             // Find or create customer
@@ -337,7 +337,7 @@ serve(async (req: Request) => {
                   if (lineError) {
                     console.error(`[ORDER_SYNC] Failed to create line item for order #${order.order_number}:`, lineError)
                   } else {
-                    logger.debug(` Created line item: ${lineItem.title} (qty: ${lineItem.quantity})`)
+                    await logger.debug(`Created line item: ${lineItem.title}`, { qty: lineItem.quantity })
                   }
                 } else {
                   // Log unmatched line item
@@ -347,7 +347,7 @@ serve(async (req: Request) => {
             }
 
             createdCount++
-            logger.debug(` Created order #${order.order_number} as ${newOrder?.id}`)
+            await logger.debug(`Created order #${order.order_number}`, { orderId: newOrder?.id })
           }
 
           processedCount++
@@ -412,7 +412,7 @@ serve(async (req: Request) => {
           jobId 
         }
       } else {
-        logger.debug(` More pages available, returning nextPageInfo`)
+        await logger.debug(`More pages available, returning nextPageInfo`)
         return { 
           success: true, 
           nextPageInfo, 

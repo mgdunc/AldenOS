@@ -38,7 +38,7 @@ serve(async (req: Request) => {
     // Set context for all subsequent logs
     logger.setContext({ integrationId, queueId, jobId })
     
-    logger.debug(`Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
+    await logger.debug(`Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
     await logger.info('Product sync started', { integrationId, queueId })
   } catch (e: any) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), { 
@@ -124,7 +124,7 @@ serve(async (req: Request) => {
           .maybeSingle()
         
         if (existingSync) {
-          logger.debug(` Another sync already processing for integration ${integrationId}`)
+          await logger.debug(`Another sync already processing for integration ${integrationId}`)
           return { success: false, error: 'Another sync is already in progress for this integration' }
         }
       }
@@ -171,7 +171,7 @@ serve(async (req: Request) => {
           await log(`Failed to create sync job: ${jobError.message}`, "error")
         } else {
           jobId = newJob.id
-          logger.debug(` Created new job ${jobId}`)
+          await logger.debug(`Created new job ${jobId}`)
         }
       }
 
@@ -182,7 +182,7 @@ serve(async (req: Request) => {
           started_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }).eq('id', jobId)
-        logger.debug(` Job ${jobId} marked as running`)
+        await logger.debug(`Job ${jobId} marked as running`)
       }
 
       if (sync_id && !page_info) await log("Starting product sync...", "info")
@@ -231,7 +231,7 @@ serve(async (req: Request) => {
 
       // Fetch ONE page
       const limit = 250
-      logger.debug(` Fetching page with limit ${limit}, page_info: ${page_info || 'none'}`)
+      await logger.debug(`Fetching page with limit ${limit}`, { page_info: page_info || 'none' })
       
       // Update heartbeat before fetching
       await updateHeartbeat()
@@ -241,7 +241,7 @@ serve(async (req: Request) => {
       // Update heartbeat after fetching
       await updateHeartbeat()
       
-      logger.debug(` Fetched ${products.length} products, nextPageInfo: ${nextPageInfo ? 'present' : 'none'}`)
+      await logger.debug(`Fetched ${products.length} products`, { nextPageInfo: nextPageInfo ? 'present' : 'none' })
       await log(`Fetched batch of ${products.length} products from Shopify.`, "info")
 
       if (products.length > 0) {
@@ -321,7 +321,7 @@ serve(async (req: Request) => {
         // 4. Execute Bulk Operations
         // First, batch delete matched variants from unmatched table
         if (matchedVariantIds.length > 0) {
-            logger.debug(` Removing ${matchedVariantIds.length} newly matched products from unmatched table`)
+            await logger.debug(`Removing ${matchedVariantIds.length} newly matched products from unmatched table`)
             await supabase
                 .from('integration_unmatched_products')
                 .delete()
@@ -330,7 +330,7 @@ serve(async (req: Request) => {
         }
 
         if (integrationUpserts.length > 0) {
-            logger.debug(` Upserting ${integrationUpserts.length} product integration links`)
+            await logger.debug(`Upserting ${integrationUpserts.length} product integration links`)
             const { error: linkError } = await supabase
                 .from('product_integrations')
                 .upsert(integrationUpserts, { onConflict: 'product_id, integration_id' })
@@ -344,7 +344,7 @@ serve(async (req: Request) => {
         }
 
         if (unmatchedBatch.length > 0) {
-            logger.debug(` Upserting ${unmatchedBatch.length} unmatched products`)
+            await logger.debug(`Upserting ${unmatchedBatch.length} unmatched products`)
             const { error: unmatchedError } = await supabase
                 .from('integration_unmatched_products')
                 .upsert(unmatchedBatch, { onConflict: 'integration_id, external_variant_id' })
@@ -364,7 +364,7 @@ serve(async (req: Request) => {
             const { data: currentJob } = await supabase.from('integration_sync_jobs').select('processed_items').eq('id', jobId).single()
             const newTotal = (currentJob?.processed_items || 0) + processedCount
             
-            logger.debug(` Updating progress: ${newTotal} total processed`)
+            await logger.debug(`Updating progress: ${newTotal} total processed`)
             await supabase.from('integration_sync_jobs').update({
                 processed_items: newTotal,
                 updated_at: new Date().toISOString()
@@ -374,12 +374,12 @@ serve(async (req: Request) => {
 
       // 5. Check for Next Page
       if (nextPageInfo) {
-          logger.debug(` More pages available. Returning nextPageInfo to client.`)
+          await logger.debug(`More pages available. Returning nextPageInfo to client.`)
           await log(`Batch complete. Processed ${processedCount}. Returning next page info to client...`, "info")
           return { success: true, nextPageInfo, jobId, message: `Processed ${processedCount} items. More pages available.` }
       } else {
           // No more pages - Complete!
-          logger.debug(` No more pages, marking job as completed`)
+          await logger.debug(`No more pages, marking job as completed`)
           if (jobId) {
             await supabase.from('integration_sync_jobs').update({
               status: 'completed',
@@ -418,7 +418,7 @@ serve(async (req: Request) => {
       
       // Try to update job status if we have an ID
       if (jobId) {
-           logger.debug(` Marking job ${jobId} as failed (${errorType})`)
+           await logger.debug(`Marking job ${jobId} as failed`, { errorType })
            await supabase.from('integration_sync_jobs').update({
               status: 'failed',
               error_message: error.message,
@@ -459,7 +459,7 @@ serve(async (req: Request) => {
         }).eq('id', queueId)
         
         if (shouldRetry) {
-          logger.debug(` Retryable error, queued for retry (attempt ${(queueItem?.retry_count || 0) + 1}/${queueItem?.max_retries})`)
+          await logger.debug(`Retryable error, queued for retry`, { attempt: (queueItem?.retry_count || 0) + 1, maxRetries: queueItem?.max_retries })
         }
       }
       

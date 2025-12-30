@@ -1,25 +1,33 @@
 /**
  * Centralized logging utility for Edge Functions
- * Writes logs to both console and system_logs database table
+ * Writes logs to both console and sync_logs database table
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
+type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 interface LogContext {
   [key: string]: unknown
 }
 
+interface SyncContext {
+  integrationId?: string
+  queueId?: string
+  jobId?: string
+}
+
 /**
  * Edge Function Logger
- * Writes to both console and system_logs table for centralized logging
+ * Writes to both console and sync_logs table for detailed sync tracking
  */
 export class EdgeLogger {
   private supabaseUrl: string
   private supabaseKey: string
   private source: string
-  private syncContext: LogContext = {}
+  private syncContext: SyncContext = {}
+  private logBuffer: Array<{level: LogLevel, message: string, details?: LogContext}> = []
+  private flushPromise: Promise<void> | null = null
 
   constructor(source: string) {
     this.source = source
@@ -29,10 +37,9 @@ export class EdgeLogger {
   }
 
   /**
-   * Set context that will be included in all subsequent logs
-   * Useful for adding integrationId, queueId, etc.
+   * Set sync context - enables database logging for all levels
    */
-  setContext(context: LogContext): void {
+  setContext(context: SyncContext): void {
     this.syncContext = { ...this.syncContext, ...context }
   }
 
@@ -44,20 +51,20 @@ export class EdgeLogger {
   }
 
   /**
-   * Get merged context with sync context
+   * Write a single log entry to sync_logs table
    */
-  private mergeContext(context?: LogContext): LogContext {
-    return { ...this.syncContext, ...context }
-  }
-
-  private async writeToDatabase(
+  private async writeToSyncLogs(
     level: LogLevel,
     message: string,
     details?: LogContext
   ): Promise<void> {
+    // Only write if we have sync context (queueId or integrationId)
+    if (!this.syncContext.queueId && !this.syncContext.integrationId) {
+      return
+    }
+
     // Don't try to write if we don't have credentials
     if (!this.supabaseUrl || !this.supabaseKey) {
-      console.warn('[EdgeLogger] Cannot write to database: missing credentials')
       return
     }
 
@@ -65,106 +72,68 @@ export class EdgeLogger {
       const supabase = createClient(this.supabaseUrl, this.supabaseKey)
       
       const logEntry = {
+        queue_id: this.syncContext.queueId || null,
+        integration_id: this.syncContext.integrationId || null,
+        function_name: this.source,
         level,
-        source: `EdgeFunction:${this.source}`,
         message,
-        details: details ? {
-          ...details,
-          timestamp: new Date().toISOString(),
-          functionName: this.source
-        } : {
-          timestamp: new Date().toISOString(),
-          functionName: this.source
-        }
+        details: details || null
       }
 
-      const { error } = await supabase.from('system_logs').insert(logEntry)
-      
-      if (error) {
-        // Log to console but don't throw - we don't want logging to break the function
-        console.error('[EdgeLogger] Failed to write to system_logs:', error.message)
-      }
+      await supabase.from('sync_logs').insert(logEntry)
     } catch (err) {
       // Silently fail to avoid breaking the function
-      console.error('[EdgeLogger] Exception writing to system_logs:', err)
+      console.error('[EdgeLogger] Exception writing to sync_logs:', err)
     }
   }
 
   /**
-   * Log a debug message (console only in Edge Functions to reduce DB writes)
+   * Log a debug message - writes to DB when sync context is set
    */
-  debug(message: string, context?: LogContext): void {
+  async debug(message: string, context?: LogContext): Promise<void> {
     console.log(`[DEBUG][${this.source}] ${message}`, context || '')
+    // Write debug logs to DB when we have sync context
+    if (this.syncContext.queueId || this.syncContext.integrationId) {
+      await this.writeToSyncLogs('debug', message, context)
+    }
   }
 
   /**
-   * Log an info message (async - awaits DB write)
+   * Log an info message
    */
   async info(message: string, context?: LogContext): Promise<void> {
-    const mergedContext = this.mergeContext(context)
-    console.log(`[INFO][${this.source}] ${message}`, mergedContext)
-    // Only write INFO to DB if it seems important (has context or syncContext)
-    if (context || Object.keys(this.syncContext).length > 0) {
-      await this.writeToDatabase('INFO', message, mergedContext)
-    }
+    console.log(`[INFO][${this.source}] ${message}`, context || '')
+    await this.writeToSyncLogs('info', message, context)
   }
 
   /**
-   * Log a warning message (async - awaits DB write)
+   * Log a warning message
    */
   async warn(message: string, context?: LogContext): Promise<void> {
-    const mergedContext = this.mergeContext(context)
-    console.warn(`[WARN][${this.source}] ${message}`, mergedContext)
-    await this.writeToDatabase('WARN', message, mergedContext)
+    console.warn(`[WARN][${this.source}] ${message}`, context || '')
+    await this.writeToSyncLogs('warn', message, context)
   }
 
   /**
-   * Log an error message (async - awaits DB write)
+   * Log an error message
    */
   async error(message: string, error?: Error | unknown, context?: LogContext): Promise<void> {
-    const mergedContext = this.mergeContext(context)
+    const errorContext: LogContext = { ...context }
     
     if (error) {
       if (error instanceof Error) {
-        mergedContext.errorName = error.name
-        mergedContext.errorMessage = error.message
-        mergedContext.errorStack = error.stack
+        errorContext.errorName = error.name
+        errorContext.errorMessage = error.message
+        errorContext.errorStack = error.stack
       } else if (typeof error === 'object') {
-        mergedContext.errorObject = error
+        errorContext.errorObject = error
       } else {
-        mergedContext.error = String(error)
+        errorContext.error = String(error)
       }
     }
 
-    console.error(`[ERROR][${this.source}] ${message}`, error || '', mergedContext)
-    await this.writeToDatabase('ERROR', message, mergedContext)
-  }
-
-  /**
-   * Log sync progress (for tracking sync operations)
-   */
-  syncProgress(
-    syncType: string,
-    integrationId: string,
-    status: 'started' | 'progress' | 'completed' | 'failed',
-    details?: LogContext
-  ): void {
-    const message = `Sync ${status}: ${syncType}`
-    const context: LogContext = {
-      syncType,
-      integrationId,
-      status,
-      ...details
-    }
-
-    if (status === 'failed') {
-      this.error(message, undefined, context)
-    } else if (status === 'completed') {
-      this.info(message, context)
-    } else {
-      // started/progress - just console, not DB (too many writes)
-      console.log(`[INFO][${this.source}] ${message}`, context)
-    }
+    console.error(`[ERROR][${this.source}] ${message}`, error || '', errorContext)
+    await this.writeToSyncLogs('error', message, errorContext)
   }
 }
 

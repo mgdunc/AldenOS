@@ -53,32 +53,17 @@ const loadQueueItem = async () => {
 
 const loadLogs = async () => {
   try {
-    // Load EdgeFunction logs from system_logs after queue creation time
+    // Load logs from sync_logs table (directly linked to queue)
     const { data, error } = await supabase
-      .from('system_logs')
+      .from('sync_logs')
       .select('*')
-      .ilike('source', 'EdgeFunction:%')
-      .gte('created_at', queueItem.value?.created_at)
+      .eq('queue_id', queueId.value)
       .order('created_at', { ascending: true })
-      .limit(200)
+      .limit(500)
 
     if (error) throw error
     
-    // Filter to only show logs relevant to this sync (by queueId or integrationId in details)
-    const filteredLogs = (data || []).filter(log => {
-      const details = log.details || {}
-      // Match if queueId matches
-      if (details.queueId === queueItem.value?.id) return true
-      // Match if integrationId matches
-      if (details.integrationId === queueItem.value?.integration_id) return true
-      // Match if functionName matches the sync type
-      const syncType = queueItem.value?.sync_type
-      if (syncType === 'product_sync' && details.functionName === 'shopify-product-sync') return true
-      if (syncType === 'order_sync' && details.functionName === 'shopify-order-sync') return true
-      return false
-    })
-    
-    logs.value = filteredLogs
+    logs.value = data || []
   } catch (error: any) {
     logger.error('Error loading logs:', error)
   }
@@ -104,10 +89,11 @@ const subscribeToUpdates = () => {
       {
         event: 'INSERT',
         schema: 'public',
-        table: 'system_logs'
+        table: 'sync_logs',
+        filter: `queue_id=eq.${queueId.value}`
       },
       () => {
-        // Reload logs when new system_logs are inserted
+        // Reload logs when new sync_logs are inserted for this queue
         loadLogs()
       }
     )
@@ -208,7 +194,7 @@ const copyLogToClipboard = async () => {
 ==========
 Timestamp: ${formatDate(selectedLog.value.created_at)}
 Level: ${selectedLog.value.level}
-Source: ${selectedLog.value.source}
+Function: ${selectedLog.value.function_name}
 Message: ${selectedLog.value.message}
 
 Details:
@@ -475,9 +461,9 @@ onUnmounted(() => {
                 </template>
               </Column>
 
-              <Column field="source" header="Source" style="width: 150px">
+              <Column field="function_name" header="Function" style="width: 150px">
                 <template #body="{ data }">
-                  <span class="text-sm text-600">{{ data.source?.replace('EdgeFunction:', '') || '-' }}</span>
+                  <span class="text-sm text-600">{{ data.function_name || '-' }}</span>
                 </template>
               </Column>
 
@@ -522,7 +508,7 @@ onUnmounted(() => {
       <div v-if="selectedLog" class="flex flex-column gap-3">
         <div class="flex align-items-center gap-2">
           <Tag :value="selectedLog.level" :severity="getLogSeverity(selectedLog.level)" />
-          <span class="text-600">{{ selectedLog.source }}</span>
+          <span class="text-600">{{ selectedLog.function_name }}</span>
         </div>
         <div>
           <label class="block text-sm font-semibold text-600 mb-1">Message</label>

@@ -36,13 +36,13 @@ serve(async (req: Request) => {
       )
     }
 
-    logger.debug(`Found ${queueItems.length} pending sync(s)`)
+    await logger.debug(`Found ${queueItems.length} pending sync(s)`)
 
     // 2. Process each queue item
     const results = []
     
     for (const item of queueItems) {
-      logger.debug(`Processing ${item.sync_type} for integration ${item.integration_id}`)
+      await logger.debug(`Processing ${item.sync_type} for integration ${item.integration_id}`)
       
       // Mark as processing
       await supabase
