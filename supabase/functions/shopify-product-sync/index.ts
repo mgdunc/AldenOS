@@ -1,12 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-// Force deploy update: 2025-12-22b
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { ShopifyClient } from "../_shared/shopify.ts"
 import { getSupabaseEnv } from "../_shared/env.ts"
+import { createLogger } from "../_shared/logger.ts"
 
-console.log("Shopify Product Sync Function Started")
+const logger = createLogger('shopify-product-sync')
+logger.debug("Shopify Product Sync Function Started")
 
 serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -34,8 +35,8 @@ serve(async (req: Request) => {
     page_info = body.page_info
     queueId = body.queueId
     
-    console.log(`[SYNC] Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
-    console.log(`[SYNC] Full body:`, JSON.stringify(body))
+    logger.debug(` Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
+    logger.debug(` Full body:`, JSON.stringify(body))
   } catch (e: any) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), { 
       status: 400,
@@ -45,7 +46,7 @@ serve(async (req: Request) => {
 
   // Validate integrationId before starting background task
   if (!integrationId) {
-    console.error('[SYNC] ERROR: integrationId is missing from request')
+    logger.error(' ERROR: integrationId is missing from request')
     return new Response(
       JSON.stringify({ error: "Integration ID is required" }),
       { 
@@ -120,7 +121,7 @@ serve(async (req: Request) => {
           .maybeSingle()
         
         if (existingSync) {
-          console.log(`[SYNC] Another sync already processing for integration ${integrationId}`)
+          logger.debug(` Another sync already processing for integration ${integrationId}`)
           return { success: false, error: 'Another sync is already in progress for this integration' }
         }
       }
@@ -163,11 +164,11 @@ serve(async (req: Request) => {
           .single()
         
         if (jobError) {
-          console.error('[SYNC] Failed to create job:', jobError)
+          logger.error(' Failed to create job:', jobError)
           await log(`Failed to create sync job: ${jobError.message}`, "error")
         } else {
           jobId = newJob.id
-          console.log(`[SYNC] Created new job ${jobId}`)
+          logger.debug(` Created new job ${jobId}`)
         }
       }
 
@@ -178,7 +179,7 @@ serve(async (req: Request) => {
           started_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }).eq('id', jobId)
-        console.log(`[SYNC] Job ${jobId} marked as running`)
+        logger.debug(` Job ${jobId} marked as running`)
       }
 
       if (sync_id && !page_info) await log("Starting product sync...", "info")
@@ -227,7 +228,7 @@ serve(async (req: Request) => {
 
       // Fetch ONE page
       const limit = 250
-      console.log(`[SYNC] Fetching page with limit ${limit}, page_info: ${page_info || 'none'}`)
+      logger.debug(` Fetching page with limit ${limit}, page_info: ${page_info || 'none'}`)
       
       // Update heartbeat before fetching
       await updateHeartbeat()
@@ -237,7 +238,7 @@ serve(async (req: Request) => {
       // Update heartbeat after fetching
       await updateHeartbeat()
       
-      console.log(`[SYNC] Fetched ${products.length} products, nextPageInfo: ${nextPageInfo ? 'present' : 'none'}`)
+      logger.debug(` Fetched ${products.length} products, nextPageInfo: ${nextPageInfo ? 'present' : 'none'}`)
       await log(`Fetched batch of ${products.length} products from Shopify.`, "info")
 
       if (products.length > 0) {
@@ -317,7 +318,7 @@ serve(async (req: Request) => {
         // 4. Execute Bulk Operations
         // First, batch delete matched variants from unmatched table
         if (matchedVariantIds.length > 0) {
-            console.log(`[SYNC] Removing ${matchedVariantIds.length} newly matched products from unmatched table`)
+            logger.debug(` Removing ${matchedVariantIds.length} newly matched products from unmatched table`)
             await supabase
                 .from('integration_unmatched_products')
                 .delete()
@@ -326,13 +327,13 @@ serve(async (req: Request) => {
         }
 
         if (integrationUpserts.length > 0) {
-            console.log(`[SYNC] Upserting ${integrationUpserts.length} product integration links`)
+            logger.debug(` Upserting ${integrationUpserts.length} product integration links`)
             const { error: linkError } = await supabase
                 .from('product_integrations')
                 .upsert(integrationUpserts, { onConflict: 'product_id, integration_id' })
             
             if (linkError) {
-                console.error('[SYNC] Error linking products:', linkError)
+                logger.error(' Error linking products:', linkError)
                 await log(`Error linking products: ${linkError.message}`, "error")
             } else {
                 await log(`Linked ${integrationUpserts.length} products`, "info")
@@ -340,13 +341,13 @@ serve(async (req: Request) => {
         }
 
         if (unmatchedBatch.length > 0) {
-            console.log(`[SYNC] Upserting ${unmatchedBatch.length} unmatched products`)
+            logger.debug(` Upserting ${unmatchedBatch.length} unmatched products`)
             const { error: unmatchedError } = await supabase
                 .from('integration_unmatched_products')
                 .upsert(unmatchedBatch, { onConflict: 'integration_id, external_variant_id' })
             
             if (unmatchedError) {
-                console.error('[SYNC] Error inserting unmatched products:', unmatchedError)
+                logger.error(' Error inserting unmatched products:', unmatchedError)
                 await log(`Error recording unmatched products: ${unmatchedError.message}`, "error")
             } else {
                 await log(`Recorded ${unmatchedBatch.length} unmatched products`, "info")
@@ -360,7 +361,7 @@ serve(async (req: Request) => {
             const { data: currentJob } = await supabase.from('integration_sync_jobs').select('processed_items').eq('id', jobId).single()
             const newTotal = (currentJob?.processed_items || 0) + processedCount
             
-            console.log(`[SYNC] Updating progress: ${newTotal} total processed`)
+            logger.debug(` Updating progress: ${newTotal} total processed`)
             await supabase.from('integration_sync_jobs').update({
                 processed_items: newTotal,
                 updated_at: new Date().toISOString()
@@ -370,12 +371,12 @@ serve(async (req: Request) => {
 
       // 5. Check for Next Page
       if (nextPageInfo) {
-          console.log(`[SYNC] More pages available. Returning nextPageInfo to client.`)
+          logger.debug(` More pages available. Returning nextPageInfo to client.`)
           await log(`Batch complete. Processed ${processedCount}. Returning next page info to client...`, "info")
           return { success: true, nextPageInfo, jobId, message: `Processed ${processedCount} items. More pages available.` }
       } else {
           // No more pages - Complete!
-          console.log(`[SYNC] No more pages, marking job as completed`)
+          logger.debug(` No more pages, marking job as completed`)
           if (jobId) {
             await supabase.from('integration_sync_jobs').update({
               status: 'completed',
@@ -396,7 +397,7 @@ serve(async (req: Request) => {
       }
 
     } catch (error: any) {
-      console.error('[SYNC] Error in sync process:', error)
+      logger.error(' Error in sync process:', error)
       
       // Classify the error
       const classifyError = (err: any): 'retryable' | 'permanent' | 'unknown' => {
@@ -413,7 +414,7 @@ serve(async (req: Request) => {
       
       // Try to update job status if we have an ID
       if (jobId) {
-           console.log(`[SYNC] Marking job ${jobId} as failed (${errorType})`)
+           logger.debug(` Marking job ${jobId} as failed (${errorType})`)
            await supabase.from('integration_sync_jobs').update({
               status: 'failed',
               error_message: error.message,
@@ -454,7 +455,7 @@ serve(async (req: Request) => {
         }).eq('id', queueId)
         
         if (shouldRetry) {
-          console.log(`[SYNC] Retryable error, queued for retry (attempt ${(queueItem?.retry_count || 0) + 1}/${queueItem?.max_retries})`)
+          logger.debug(` Retryable error, queued for retry (attempt ${(queueItem?.retry_count || 0) + 1}/${queueItem?.max_retries})`)
         }
       }
       
@@ -472,7 +473,7 @@ serve(async (req: Request) => {
   )
   } catch (fatalError: any) {
     // This catch block ensures CORS headers are returned even on fatal errors
-    console.error('[SYNC] Fatal error:', fatalError.message || fatalError)
+    logger.error(' Fatal error:', fatalError.message || fatalError)
     return new Response(
       JSON.stringify({ 
         success: false, 

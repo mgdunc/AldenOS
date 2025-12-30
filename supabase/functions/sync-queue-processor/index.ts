@@ -3,8 +3,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { getSupabaseEnv } from "../_shared/env.ts"
+import { createLogger } from "../_shared/logger.ts"
 
-console.log("Sync Queue Processor Started")
+const logger = createLogger('sync-queue-processor')
+logger.debug("Sync Queue Processor Started")
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -34,13 +36,13 @@ serve(async (req: Request) => {
       )
     }
 
-    console.log(`[QUEUE] Found ${queueItems.length} pending sync(s)`)
+    logger.debug(`Found ${queueItems.length} pending sync(s)`)
 
     // 2. Process each queue item
     const results = []
     
     for (const item of queueItems) {
-      console.log(`[QUEUE] Processing ${item.sync_type} for integration ${item.integration_id}`)
+      logger.debug(`Processing ${item.sync_type} for integration ${item.integration_id}`)
       
       // Mark as processing
       await supabase
@@ -61,7 +63,7 @@ serve(async (req: Request) => {
           functionName = 'shopify-order-sync'
           break
         default:
-          console.error(`[QUEUE] Unknown sync type: ${item.sync_type}`)
+          logger.error(`Unknown sync type: ${item.sync_type}`)
           await supabase
             .from('sync_queue')
             .update({ 
@@ -94,7 +96,7 @@ serve(async (req: Request) => {
         })
 
       } catch (error: any) {
-        console.error(`[QUEUE] Error processing ${item.sync_type}:`, error)
+        logger.error(`Error processing ${item.sync_type}`, error)
         
         // Check if we should retry
         const shouldRetry = item.retry_count < item.max_retries
@@ -145,7 +147,7 @@ serve(async (req: Request) => {
 
   } catch (error: any) {
     // This catch block ensures CORS headers are returned even on fatal errors
-    console.error('[QUEUE] Processor error:', error.message || error)
+    logger.error('Processor error', error)
     return new Response(
       JSON.stringify({ 
         success: false,

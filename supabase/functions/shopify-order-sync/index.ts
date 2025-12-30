@@ -4,8 +4,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 import { ShopifyClient } from '../_shared/shopify.ts'
 import { getSupabaseEnv } from '../_shared/env.ts'
+import { createLogger } from '../_shared/logger.ts'
 
-console.log("Shopify Order Sync Function Started")
+const logger = createLogger('shopify-order-sync')
+logger.debug("Shopify Order Sync Function Started")
 
 serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -31,7 +33,7 @@ serve(async (req: Request) => {
       page_info = body.page_info
       queueId = body.queueId
       
-      console.log(`[ORDER_SYNC] Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
+      logger.debug(` Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
     } catch (_e: any) {
       return new Response(JSON.stringify({ error: "Invalid request body" }), { 
         status: 400,
@@ -41,7 +43,7 @@ serve(async (req: Request) => {
 
     // Validate integrationId
     if (!integrationId) {
-      console.error('[ORDER_SYNC] ERROR: integrationId is missing from request')
+      logger.error(' ERROR: integrationId is missing from request')
       return new Response(
         JSON.stringify({ error: "Integration ID is required" }),
         { 
@@ -79,7 +81,7 @@ serve(async (req: Request) => {
           .maybeSingle()
         
         if (existingSync) {
-          console.log(`[ORDER_SYNC] Another sync already processing for integration ${integrationId}`)
+          logger.debug(` Another sync already processing for integration ${integrationId}`)
           return { success: false, error: 'Another sync is already in progress for this integration' }
         }
       }
@@ -123,11 +125,11 @@ serve(async (req: Request) => {
           .single()
         
         if (jobError) {
-          console.error('[ORDER_SYNC] Failed to create job:', jobError)
+          logger.error(' Failed to create job:', jobError)
           await log(`Failed to create sync job: ${jobError.message}`, "error")
         } else {
           jobId = newJob.id
-          console.log(`[ORDER_SYNC] Created new job ${jobId}`)
+          logger.debug(` Created new job ${jobId}`)
         }
       }
 
@@ -138,7 +140,7 @@ serve(async (req: Request) => {
           started_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }).eq('id', jobId)
-        console.log(`[ORDER_SYNC] Job ${jobId} marked as running`)
+        logger.debug(` Job ${jobId} marked as running`)
         await log("Starting order sync...", "info")
       }
 
@@ -163,18 +165,18 @@ serve(async (req: Request) => {
               updated_at: new Date().toISOString()
             }).eq('id', jobId)
           }
-          console.log(`[ORDER_SYNC] Total orders: ${count}`)
+          logger.debug(` Total orders: ${count}`)
         } catch (e) {
-          console.warn('[ORDER_SYNC] Could not get total count:', e)
+          logger.warn(' Could not get total count:', e)
         }
       }
 
       // Fetch one page of orders
-      console.log(`[ORDER_SYNC] Fetching orders page...`)
+      logger.debug(` Fetching orders page...`)
       await updateHeartbeat()
       
       const { orders, nextPageInfo } = await shopify.getOrdersPage(50, page_info, 'any')
-      console.log(`[ORDER_SYNC] Fetched ${orders.length} orders`)
+      logger.debug(` Fetched ${orders.length} orders`)
 
       let processedCount = 0
       let matchedCount = 0
@@ -196,7 +198,7 @@ serve(async (req: Request) => {
             // Order exists - skip
             matchedCount++
             skippedCount++
-            console.log(`[ORDER_SYNC] Order #${order.order_number} already exists as ${existingOrder.id}`)
+            logger.debug(` Order #${order.order_number} already exists as ${existingOrder.id}`)
           } else {
             // Create new order
             // Find or create customer
@@ -331,7 +333,7 @@ serve(async (req: Request) => {
                   if (lineError) {
                     console.error(`[ORDER_SYNC] Failed to create line item for order #${order.order_number}:`, lineError)
                   } else {
-                    console.log(`[ORDER_SYNC] Created line item: ${lineItem.title} (qty: ${lineItem.quantity})`)
+                    logger.debug(` Created line item: ${lineItem.title} (qty: ${lineItem.quantity})`)
                   }
                 } else {
                   // Log unmatched line item
@@ -341,7 +343,7 @@ serve(async (req: Request) => {
             }
 
             createdCount++
-            console.log(`[ORDER_SYNC] Created order #${order.order_number} as ${newOrder?.id}`)
+            logger.debug(` Created order #${order.order_number} as ${newOrder?.id}`)
           }
 
           processedCount++
@@ -398,7 +400,7 @@ serve(async (req: Request) => {
         }
 
         await log(`Order sync completed. Created: ${createdCount}, Matched: ${matchedCount}, Errors: ${errorCount}`, "success")
-        console.log(`[ORDER_SYNC] Sync complete!`)
+        logger.debug(` Sync complete!`)
         
         return { 
           success: true, 
@@ -406,7 +408,7 @@ serve(async (req: Request) => {
           jobId 
         }
       } else {
-        console.log(`[ORDER_SYNC] More pages available, returning nextPageInfo`)
+        logger.debug(` More pages available, returning nextPageInfo`)
         return { 
           success: true, 
           nextPageInfo, 
@@ -463,7 +465,7 @@ serve(async (req: Request) => {
   )
   } catch (fatalError: any) {
     // This catch block ensures CORS headers are returned even on fatal errors
-    console.error('[ORDER_SYNC] Fatal error:', fatalError.message || fatalError)
+    logger.error(' Fatal error:', fatalError.message || fatalError)
     return new Response(
       JSON.stringify({ 
         success: false, 
