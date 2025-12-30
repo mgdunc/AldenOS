@@ -544,13 +544,19 @@ onMounted(() => fetchOrderData())
             </div>
 
             <div class="grid">
-                <div class="col-12 md:col-4">
+                <div class="col-12 md:col-3">
                     <div class="surface-50 p-3 border-round h-full">
                         <span class="text-500 text-sm font-medium block mb-2">Customer</span>
                         <div class="text-xl font-bold text-900">{{ order.customer_name || 'No Customer' }}</div>
                     </div>
                 </div>
-                <div class="col-12 md:col-4">
+                <div class="col-12 md:col-3">
+                    <div class="surface-50 p-3 border-round h-full">
+                        <span class="text-500 text-sm font-medium block mb-2">Order Date</span>
+                        <div class="text-lg font-semibold text-900">{{ formatDate(order.created_at) }}</div>
+                    </div>
+                </div>
+                <div class="col-12 md:col-3">
                     <div class="surface-50 p-3 border-round h-full">
                         <span class="text-500 text-sm font-medium block mb-2">Expected Dispatch</span>
                         <div class="flex gap-2 align-items-center">
@@ -559,7 +565,7 @@ onMounted(() => fetchOrderData())
                         </div>
                     </div>
                 </div>
-                <div class="col-12 md:col-4">
+                <div class="col-12 md:col-3">
                     <div class="surface-50 p-3 border-round h-full flex flex-column justify-content-between">
                         <span class="text-500 text-sm font-medium block">Total Amount</span>
                         <div class="text-3xl font-bold text-primary text-right">{{ formatCurrency(calculatedTotal) }}</div>
