@@ -11,6 +11,10 @@ export const getStatusSeverity = (status: string | null | undefined) => {
         case 'purchase':
             return 'success';
 
+        case 'new':
+            return 'info';
+
+        case 'confirmed':
         case 'picking': 
         case 'packed':
             return 'primary';
@@ -19,6 +23,7 @@ export const getStatusSeverity = (status: string | null | undefined) => {
         case 'requires_items': 
         case 'clearance':
         case 'adjustment':
+        case 'awaiting_stock':
             return 'warn';
             
         case 'draft': 

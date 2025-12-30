@@ -198,20 +198,30 @@ serve(async (req: Request) => {
             .eq('shopify_order_id', order.id)
             .maybeSingle()
 
-          // Map Shopify status to our status
-          const mapOrderStatus = () => {
+          // Map Shopify status to our status for UPDATES (preserve existing workflow status unless significant change)
+          const mapOrderStatusForUpdate = (currentStatus: string) => {
+            // Always override to these terminal statuses
             if (order.cancelled_at) return 'cancelled'
             if (order.fulfillment_status === 'fulfilled') return 'completed'
             if (order.fulfillment_status === 'partial') return 'partially_shipped'
-            if (order.financial_status === 'paid' || order.financial_status === 'partially_paid') return 'confirmed'
-            return 'draft'
+            // Otherwise keep current status to preserve workflow progress
+            return currentStatus
+          }
+          
+          // Map Shopify status to our status for NEW orders
+          const mapOrderStatusForNew = () => {
+            if (order.cancelled_at) return 'cancelled'
+            if (order.fulfillment_status === 'fulfilled') return 'completed'
+            if (order.fulfillment_status === 'partial') return 'partially_shipped'
+            // All new imported orders start as "new" until processed
+            return 'new'
           }
 
           if (existingOrder) {
             // Order exists - UPDATE it
             matchedCount++
             
-            const newStatus = mapOrderStatus()
+            const newStatus = mapOrderStatusForUpdate(existingOrder.status)
             
             // Update order details
             const { error: updateError } = await supabase
@@ -342,7 +352,7 @@ serve(async (req: Request) => {
                 shopify_order_id: order.id,
                 customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : null,
                 customer_id: customerId,
-                status: mapOrderStatus(),
+                status: mapOrderStatusForNew(),
                 total_amount: parseFloat(order.total_price) || 0,
                 shipping_address: order.shipping_address ? {
                   name: order.shipping_address.name,

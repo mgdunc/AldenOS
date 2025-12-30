@@ -30,13 +30,16 @@ const { handleError } = useErrorHandler()
 const expandedRows = ref([])
 const activeTab = ref('all')
 const searchTerm = ref('')
+const rowsPerPage = ref(25)
+const rowsPerPageOptions = [10, 25, 50, 100]
 
 // KPI Counters
 const kpis = computed(() => {
     return {
+        new: store.orders.filter(o => o.status === 'new').length,
         draft: store.orders.filter(o => o.status === 'draft').length,
         awaiting: store.orders.filter(o => o.status === 'awaiting_stock' || o.status === 'requires_items').length,
-        ready: store.orders.filter(o => ['reserved', 'picking'].includes(o.status)).length,
+        ready: store.orders.filter(o => ['reserved', 'picking', 'confirmed'].includes(o.status)).length,
         shipped: store.orders.filter(o => o.status === 'shipped').length
     }
 })
@@ -58,12 +61,13 @@ const filteredOrders = computed(() => {
     if (activeTab.value === 'all') return result
     
     if (activeTab.value === 'active') {
-        return result.filter(o => !['shipped', 'cancelled', 'delivered'].includes(o.status))
+        return result.filter(o => !['shipped', 'cancelled', 'delivered', 'completed'].includes(o.status))
     }
     
+    if (activeTab.value === 'new') return result.filter(o => o.status === 'new')
     if (activeTab.value === 'draft') return result.filter(o => o.status === 'draft')
     if (activeTab.value === 'awaiting') return result.filter(o => ['awaiting_stock', 'requires_items'].includes(o.status))
-    if (activeTab.value === 'ready') return result.filter(o => ['reserved', 'picking', 'packed', 'partially_shipped'].includes(o.status))
+    if (activeTab.value === 'ready') return result.filter(o => ['reserved', 'picking', 'packed', 'confirmed', 'partially_shipped'].includes(o.status))
     
     return result
 })
@@ -109,7 +113,18 @@ onMounted(fetchOrders)
     <div class="flex flex-column gap-4">
         
         <div class="grid">
-            <div class="col-12 md:col-3">
+            <div class="col-6 md:col-2">
+                <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full cursor-pointer hover:surface-50 transition-colors" @click="activeTab = 'new'">
+                    <div>
+                        <span class="block text-500 font-medium mb-2">New</span>
+                        <div class="text-900 font-bold text-2xl">{{ kpis.new }}</div>
+                    </div>
+                    <div class="flex align-items-center justify-content-center bg-cyan-100 border-round" style="width:2.5rem;height:2.5rem">
+                        <i class="pi pi-sparkles text-cyan-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 md:col-2">
                 <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full cursor-pointer hover:surface-50 transition-colors" @click="activeTab = 'draft'">
                     <div>
                         <span class="block text-500 font-medium mb-2">Drafts</span>
@@ -120,10 +135,10 @@ onMounted(fetchOrders)
                     </div>
                 </div>
             </div>
-            <div class="col-12 md:col-3">
+            <div class="col-6 md:col-2">
                 <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full cursor-pointer hover:surface-50 transition-colors" @click="activeTab = 'awaiting'">
                     <div>
-                        <span class="block text-500 font-medium mb-2">Awaiting Stock</span>
+                        <span class="block text-500 font-medium mb-2">Awaiting</span>
                         <div class="text-900 font-bold text-2xl">{{ kpis.awaiting }}</div>
                     </div>
                     <div class="flex align-items-center justify-content-center bg-orange-100 border-round" style="width:2.5rem;height:2.5rem">
@@ -131,10 +146,10 @@ onMounted(fetchOrders)
                     </div>
                 </div>
             </div>
-            <div class="col-12 md:col-3">
+            <div class="col-6 md:col-2">
                 <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full cursor-pointer hover:surface-50 transition-colors" @click="activeTab = 'ready'">
                     <div>
-                        <span class="block text-500 font-medium mb-2">Ready to Pack</span>
+                        <span class="block text-500 font-medium mb-2">Ready</span>
                         <div class="text-900 font-bold text-2xl">{{ kpis.ready }}</div>
                     </div>
                     <div class="flex align-items-center justify-content-center bg-green-100 border-round" style="width:2.5rem;height:2.5rem">
@@ -142,14 +157,25 @@ onMounted(fetchOrders)
                     </div>
                 </div>
             </div>
-            <div class="col-12 md:col-3">
-                <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full cursor-pointer hover:surface-50 transition-colors" @click="activeTab = 'all'">
+            <div class="col-6 md:col-2">
+                <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full cursor-pointer hover:surface-50 transition-colors" @click="activeTab = 'active'">
                     <div>
-                        <span class="block text-500 font-medium mb-2">Total Active</span>
-                        <div class="text-900 font-bold text-2xl">{{ kpis.draft + kpis.awaiting + kpis.ready }}</div>
+                        <span class="block text-500 font-medium mb-2">Active</span>
+                        <div class="text-900 font-bold text-2xl">{{ kpis.new + kpis.draft + kpis.awaiting + kpis.ready }}</div>
                     </div>
                     <div class="flex align-items-center justify-content-center bg-blue-100 border-round" style="width:2.5rem;height:2.5rem">
                         <i class="pi pi-chart-bar text-blue-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 md:col-2">
+                <div class="surface-card shadow-2 p-3 border-round flex justify-content-between align-items-center h-full cursor-pointer hover:surface-50 transition-colors" @click="activeTab = 'all'">
+                    <div>
+                        <span class="block text-500 font-medium mb-2">Total</span>
+                        <div class="text-900 font-bold text-2xl">{{ store.orders.length }}</div>
+                    </div>
+                    <div class="flex align-items-center justify-content-center bg-purple-100 border-round" style="width:2.5rem;height:2.5rem">
+                        <i class="pi pi-list text-purple-500 text-xl"></i>
                     </div>
                 </div>
             </div>
@@ -158,14 +184,15 @@ onMounted(fetchOrders)
         <div class="card shadow-2 p-0 border-round overflow-hidden surface-card">
             
             <div class="p-3 border-bottom-1 surface-border flex flex-wrap gap-2 justify-content-between align-items-center">
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                     <Button label="All" size="small" :outlined="activeTab !== 'all'" @click="activeTab = 'all'" />
+                    <Button label="New" size="small" severity="info" :outlined="activeTab !== 'new'" @click="activeTab = 'new'" />
                     <Button label="Active" size="small" :outlined="activeTab !== 'active'" @click="activeTab = 'active'" />
-                    <Button label="Awaiting Stock" size="small" severity="warning" :outlined="activeTab !== 'awaiting'" @click="activeTab = 'awaiting'" />
+                    <Button label="Awaiting" size="small" severity="warning" :outlined="activeTab !== 'awaiting'" @click="activeTab = 'awaiting'" />
                     <Button label="Ready" size="small" severity="success" :outlined="activeTab !== 'ready'" @click="activeTab = 'ready'" />
                 </div>
 
-                <div class="flex gap-2">
+                <div class="flex gap-2 align-items-center">
                     <span class="p-input-icon-left">
                         <i class="pi pi-search" />
                         <InputText v-model="searchTerm" placeholder="Search..." class="p-inputtext-sm" />
@@ -181,12 +208,14 @@ onMounted(fetchOrders)
                 :loading="loading" 
                 stripedRows 
                 paginator 
-                :rows="10"
+                :rows="rowsPerPage"
+                :rowsPerPageOptions="rowsPerPageOptions"
                 selectionMode="single" 
                 dataKey="id"
                 @rowSelect="(e: any) => router.push(`/sales/${e.data.id}`)"
                 :scrollable="!isMobile"
                 responsiveLayout="scroll"
+                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
             >
                 <template #empty><div class="p-4 text-center">No sales orders found for this filter.</div></template>
 
@@ -245,19 +274,35 @@ onMounted(fetchOrders)
 
                 <template #expansion="{ data }">
                     <div class="p-3 surface-50 border-bottom-1 surface-border">
-                        <span class="font-bold block mb-2 text-sm text-500">Order Contents</span>
-                        <DataTable :value="data.sales_order_lines" size="small" class="p-datatable-sm">
-                            <Column field="products.sku" header="SKU" />
-                            <Column field="products.name" header="Product" />
-                            <Column field="quantity_ordered" header="Qty" />
-                            <Column field="quantity_fulfilled" header="Shipped">
+                        <span class="font-bold block mb-2 text-sm text-500">Order Contents ({{ data.lines?.length || 0 }} items)</span>
+                        <DataTable v-if="data.lines?.length" :value="data.lines" size="small" class="p-datatable-sm">
+                            <Column field="products.sku" header="SKU" style="width: 120px">
+                                <template #body="{ data: line }">
+                                    <code class="text-sm">{{ line.products?.sku || '-' }}</code>
+                                </template>
+                            </Column>
+                            <Column field="products.name" header="Product">
+                                <template #body="{ data: line }">
+                                    {{ line.products?.name || 'Unknown Product' }}
+                                </template>
+                            </Column>
+                            <Column field="quantity_ordered" header="Qty" style="width: 80px" class="text-center" />
+                            <Column field="quantity_fulfilled" header="Shipped" style="width: 80px">
                                 <template #body="{ data: line }">
                                     <span :class="line.quantity_fulfilled > 0 ? 'text-green-600 font-bold' : 'text-300'">
                                         {{ line.quantity_fulfilled || 0 }}
                                     </span>
                                 </template>
                             </Column>
+                            <Column header="Status" style="width: 100px">
+                                <template #body="{ data: line }">
+                                    <Tag v-if="line.quantity_fulfilled >= line.quantity_ordered" value="SHIPPED" severity="success" class="text-xs" />
+                                    <Tag v-else-if="line.quantity_fulfilled > 0" value="PARTIAL" severity="warning" class="text-xs" />
+                                    <Tag v-else value="PENDING" severity="secondary" class="text-xs" />
+                                </template>
+                            </Column>
                         </DataTable>
+                        <div v-else class="text-500 text-sm py-2">No line items</div>
                     </div>
                 </template>
 
