@@ -53,15 +53,14 @@ const loadQueueItem = async () => {
 
 const loadLogs = async () => {
   try {
-    // Load logs from system_logs where source is EdgeFunction and timestamp is after queue creation
-    // Also filter by queueId in details if available
+    // Load EdgeFunction logs from system_logs after queue creation time
     const { data, error } = await supabase
       .from('system_logs')
       .select('*')
-      .or(`source.ilike.EdgeFunction:%,details->integrationId.eq.${queueItem.value?.integration_id},details->queueId.eq.${queueItem.value?.id}`)
+      .ilike('source', 'EdgeFunction:%')
       .gte('created_at', queueItem.value?.created_at)
       .order('created_at', { ascending: true })
-      .limit(100)
+      .limit(200)
 
     if (error) throw error
     
@@ -70,8 +69,8 @@ const loadLogs = async () => {
       const details = log.details || {}
       // Match if queueId matches
       if (details.queueId === queueItem.value?.id) return true
-      // Match if integrationId matches and it's an EdgeFunction log
-      if (details.integrationId === queueItem.value?.integration_id && log.source?.startsWith('EdgeFunction:')) return true
+      // Match if integrationId matches
+      if (details.integrationId === queueItem.value?.integration_id) return true
       // Match if functionName matches the sync type
       const syncType = queueItem.value?.sync_type
       if (syncType === 'product_sync' && details.functionName === 'shopify-product-sync') return true
