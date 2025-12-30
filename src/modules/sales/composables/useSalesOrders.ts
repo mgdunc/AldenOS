@@ -193,18 +193,31 @@ export function useSalesOrders() {
     saving.value = true
 
     try {
-      // Use RPC if you have inventory allocation logic
-      const { error } = await supabase.rpc('allocate_inventory_and_confirm_order', {
-        p_order_id: id
+      // Use RPC to allocate inventory and confirm the order
+      const { data, error } = await supabase.rpc('allocate_inventory_and_confirm_order', {
+        p_order_id: id,
+        p_new_status: 'confirmed'
       })
 
       if (error) throw error
 
-      toast.add({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Order confirmed and inventory allocated'
-      })
+      // Check allocation result
+      const result = data as { status: string; allocated: number; backordered: number } | null
+      
+      if (result?.backordered > 0) {
+        toast.add({
+          severity: 'warn',
+          summary: 'Partially Allocated',
+          detail: `Order confirmed. ${result.allocated} items allocated, ${result.backordered} items backordered (awaiting stock).`,
+          life: 5000
+        })
+      } else {
+        toast.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Order confirmed and inventory allocated'
+        })
+      }
 
       // Reload order
       return await loadOrder(id)
