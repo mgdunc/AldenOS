@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { useShopifyStore } from '../store'
 import type { ShopifyIntegration, ShopifyIntegrationSettings } from '../types'
+import { logger } from '@/lib/logger'
 
 export function useShopifyIntegration() {
   const toast = useToast()
@@ -38,7 +39,7 @@ export function useShopifyIntegration() {
         store.setSelectedIntegration(null)
       }
     } catch (error: any) {
-      console.error('Error loading integrations:', error)
+      logger.error('Error loading integrations:', error)
       toast.add({ 
         severity: 'error', 
         summary: 'Error', 
@@ -64,7 +65,7 @@ export function useShopifyIntegration() {
 
       return data as ShopifyIntegration
     } catch (error: any) {
-      console.error('Error loading integration:', error)
+      logger.error('Error loading integration:', error)
       toast.add({ 
         severity: 'error', 
         summary: 'Error', 
@@ -109,7 +110,7 @@ export function useShopifyIntegration() {
 
       return newIntegration
     } catch (error: any) {
-      console.error('Error creating integration:', error)
+      logger.error('Error creating integration:', error)
       toast.add({ 
         severity: 'error', 
         summary: 'Error', 
@@ -151,7 +152,7 @@ export function useShopifyIntegration() {
 
       return updated
     } catch (error: any) {
-      console.error('Error updating integration:', error)
+      logger.error('Error updating integration:', error)
       toast.add({ 
         severity: 'error', 
         summary: 'Error', 
@@ -184,7 +185,7 @@ export function useShopifyIntegration() {
 
       return true
     } catch (error: any) {
-      console.error('Error deleting integration:', error)
+      logger.error('Error deleting integration:', error)
       toast.add({ 
         severity: 'error', 
         summary: 'Error', 

@@ -1,4 +1,7 @@
 -- 0. Auth User (admin@lampsy.com / password123)
+-- ⚠️ WARNING: This is a DEVELOPMENT-ONLY seed file with hardcoded credentials.
+-- ⚠️ NEVER use this seed file in production environments.
+-- ⚠️ The password 'password123' is for local development only.
 -- Note: This user is created in the auth schema, which is not dumped by 'supabase db dump'.
 INSERT INTO auth.users (
     instance_id,

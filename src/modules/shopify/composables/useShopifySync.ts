@@ -1,8 +1,9 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { ShopifySyncJob, ShopifyIntegrationLog } from '../types'
+import { logger } from '@/lib/logger'
 
 export function useShopifySync(integrationId: string, jobType: 'product_sync' | 'order_sync') {
   const toast = useToast()
@@ -11,6 +12,11 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
   const history = ref<ShopifySyncJob[]>([])
   const liveLogs = ref<string[]>([])
   const loadingHistory = ref(false)
+
+  // Debug: trace syncing state changes
+  watch(syncing, (newVal, oldVal) => {
+    logger.debug(`[useShopifySync:${jobType}] syncing changed: ${oldVal} -> ${newVal}`)
+  })
 
   let logChannel: RealtimeChannel | null = null
   let jobChannel: RealtimeChannel | null = null
@@ -127,18 +133,48 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
 
       if (error) throw error
 
+      logger.debug(`[useShopifySync:${jobType}] fetchHistory returned: ${data?.length} jobs`)
+      
       history.value = (data || []) as ShopifySyncJob[]
 
       // Set current job if one is running
-      const runningJob = history.value.find(
-        j => j.status === 'running' || j.status === 'pending'
-      )
+      // But check if it's stale (older than 30 minutes = likely dead)
+      const STALE_THRESHOLD_MS = 30 * 60 * 1000 // 30 minutes
+      const now = Date.now()
+      
+      const runningJob = history.value.find(j => {
+        if (j.status !== 'running' && j.status !== 'pending') return false
+        
+        // Check if the job is stale
+        const jobTime = new Date(j.created_at).getTime()
+        const ageMs = now - jobTime
+        
+        if (ageMs > STALE_THRESHOLD_MS) {
+          logger.debug(`[useShopifySync:${jobType}] Found stale job ${j.id}, age: ${Math.round(ageMs / 60000)} minutes - ignoring`)
+          // Optionally mark it as failed
+          supabase.from('integration_sync_jobs').update({
+            status: 'failed',
+            error_message: 'Job timed out - no activity for 30+ minutes'
+          }).eq('id', j.id).then(() => {
+            logger.debug(`[useShopifySync:${jobType}] Marked stale job ${j.id} as failed`)
+          })
+          return false
+        }
+        
+        return true
+      })
+      
+      logger.debug(`[useShopifySync:${jobType}] runningJob:`, { runningJob })
+      
       if (runningJob) {
+        logger.debug(`[useShopifySync:${jobType}] Found running job, setting syncing=true`)
         currentJob.value = runningJob
         syncing.value = true
+      } else {
+        logger.debug(`[useShopifySync:${jobType}] No running job found, syncing stays false`)
       }
     } catch (error: any) {
-      console.error('Error fetching history:', error)
+      logger.error('Error fetching history', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -150,14 +186,22 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
   }
 
   const startSync = async () => {
-    if (syncing.value) return
+    logger.debug(`[useShopifySync] startSync called for ${jobType}, integrationId: ${integrationId}`)
+    logger.debug(`[useShopifySync] syncing.value:`, { syncing: syncing.value })
+    
+    if (syncing.value) {
+      logger.debug(`[useShopifySync] Already syncing, returning early`)
+      return
+    }
 
     syncing.value = true
+    logger.debug(`[useShopifySync] Set syncing = true`)
     liveLogs.value = []
     liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Starting ${jobType} for integration ${integrationId}...`)
 
     try {
       // Check if there's already a pending/processing sync for this integration
+      logger.debug(`[useShopifySync] Checking for existing queue entry...`)
       const { data: existingQueue, error: checkError } = await supabase
         .from('sync_queue')
         .select('id, status')
@@ -165,6 +209,8 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
         .eq('sync_type', jobType)
         .in('status', ['pending', 'processing'])
         .maybeSingle()
+
+      logger.debug(`[useShopifySync] existingQueue:`, { existingQueue, checkError })
 
       if (checkError) {
         throw new Error(`Failed to check queue: ${checkError.message}`)
@@ -265,10 +311,23 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
 
       if (!syncing.value) {
          liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Sync cancelled by user.`)
+      } else {
+        // Sync loop completed - reset syncing state
+        // The realtime subscription should also set this, but we set it here as a failsafe
+        syncing.value = false
+        liveLogs.value.push(`[${new Date().toLocaleTimeString()}] Sync completed successfully.`)
+      }
+
+      // Update sync_queue status to completed
+      if (queueEntry?.id) {
+        await supabase.from('sync_queue').update({
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        }).eq('id', queueEntry.id)
       }
 
     } catch (error: any) {
-      console.error('Sync error:', error)
+      logger.error('Sync error', error)
       liveLogs.value.push(`[${new Date().toLocaleTimeString()}] FATAL ERROR: ${error.message || error}`)
       syncing.value = false
       toast.add({
@@ -277,10 +336,8 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
         detail: error.message || 'Failed to start sync'
       })
     }
-    // Note: We don't set syncing = false here for success, 
-    // we let the realtime subscription handle the 'completed' status update
-    // to ensure the UI is perfectly in sync with the DB state.
-    // However, if we error out, we force it false.
+    // Note: We set syncing = false in both success and error cases now
+    // to ensure the button state is always properly reset.
   }
 
   const cancelSync = async () => {
@@ -300,7 +357,7 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
         detail: 'The sync will stop shortly'
       })
     } catch (error: any) {
-      console.error('Cancel error:', error)
+      logger.error('Cancel error', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -322,12 +379,28 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
       supabase.removeChannel(jobChannel)
       jobChannel = null
     }
+    initialized = false
   }
 
-  onMounted(() => {
+  // Initialize subscriptions and fetch history
+  // Can be called manually if composable is created outside setup context
+  let initialized = false
+  const init = () => {
+    if (initialized) {
+      logger.debug(`[useShopifySync] init() already called for ${jobType}, skipping`)
+      return
+    }
+    initialized = true
+    logger.debug(`[useShopifySync] init() for ${jobType}`)
     subscribeToLogs()
     subscribeToJobs()
     fetchHistory()
+  }
+
+  // Auto-init if we're inside a component's setup context
+  // getCurrentInstance check ensures we only auto-init when onMounted will fire
+  onMounted(() => {
+    init()
   })
 
   onUnmounted(() => {
@@ -347,6 +420,7 @@ export function useShopifySync(integrationId: string, jobType: 'product_sync' | 
     cancelSync,
     fetchHistory,
     clearLogs,
-    cleanup
+    cleanup,
+    init
   }
 }

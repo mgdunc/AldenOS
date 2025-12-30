@@ -12,6 +12,7 @@ import Drawer from 'primevue/drawer' // For mobile sidebar
 import ErrorView from '@/modules/core/views/ErrorView.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
+import { logger } from '@/lib/logger'
 
 const router = useRouter()
 const route = useRoute()
@@ -21,7 +22,7 @@ const globalError = ref<any>(null)
 const searchVisible = ref(false)
 
 onErrorCaptured((err) => {
-    console.error('Global Error Captured:', err)
+    logger.error('Global Error Captured', err as Error)
     globalError.value = err
     return false // Prevent propagation
 })
@@ -35,7 +36,7 @@ onMounted(() => {
     // Safety timeout: If auth takes too long, stop loading so user can at least see the app (or login screen)
     setTimeout(() => {
         if (authStore.loading) {
-            console.warn('Auth initialization timed out, forcing app load.')
+            logger.warn('Auth initialization timed out, forcing app load.')
             authStore.loading = false
         }
     }, 5000)

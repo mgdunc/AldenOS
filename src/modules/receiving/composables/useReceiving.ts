@@ -7,6 +7,7 @@ import type {
   InventoryReceiptLineWithRelations,
   ReceivingFilters 
 } from '../types'
+import { logger } from '@/lib/logger'
 
 export function useReceiving() {
   const store = useReceivingStore()
@@ -286,7 +287,7 @@ export function useReceiving() {
 
       return true
     } catch (error: any) {
-      console.error('Error updating PO status:', error)
+      logger.error('Error updating PO status', error)
       return false
     }
   }
@@ -305,7 +306,7 @@ export function useReceiving() {
 
       return data || []
     } catch (error: any) {
-      console.error('Error loading locations:', error)
+      logger.error('Error loading locations', error)
       return []
     }
   }

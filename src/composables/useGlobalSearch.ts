@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/logger'
 
 export interface SearchResult {
   id: string
@@ -138,7 +139,7 @@ export function useGlobalSearch() {
 
       results.value = searchResults
     } catch (error) {
-      console.error('Global search error:', error)
+      logger.error('Global search error', error as Error)
       results.value = []
     } finally {
       loading.value = false

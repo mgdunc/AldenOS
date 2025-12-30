@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { useSalesStore } from '../store'
 import type { SalesOrder, SalesOrderLine, SalesOrderFilters, Fulfillment, Customer } from '../types'
+import { logger } from '@/lib/logger'
 
 export function useSalesOrders() {
   const toast = useToast()
@@ -68,7 +69,7 @@ export function useSalesOrders() {
       store.setOrders(orders)
       return orders
     } catch (error: any) {
-      console.error('Error loading orders:', error)
+      logger.error('Error loading orders', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -97,7 +98,7 @@ export function useSalesOrders() {
       store.setCurrentOrder(order)
       return order
     } catch (error: any) {
-      console.error('Error loading order:', error)
+      logger.error('Error loading order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -143,7 +144,7 @@ export function useSalesOrders() {
       // Reload to get complete data
       return await loadOrder(order.id)
     } catch (error: any) {
-      console.error('Error creating order:', error)
+      logger.error('Error creating order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -176,7 +177,7 @@ export function useSalesOrders() {
 
       return data as SalesOrder
     } catch (error: any) {
-      console.error('Error updating order:', error)
+      logger.error('Error updating order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -208,7 +209,7 @@ export function useSalesOrders() {
       // Reload order
       return await loadOrder(id)
     } catch (error: any) {
-      console.error('Error confirming order:', error)
+      logger.error('Error confirming order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -242,7 +243,7 @@ export function useSalesOrders() {
 
       return await loadOrder(id)
     } catch (error: any) {
-      console.error('Error cancelling order:', error)
+      logger.error('Error cancelling order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -274,7 +275,7 @@ export function useSalesOrders() {
 
       return data as Fulfillment
     } catch (error: any) {
-      console.error('Error creating fulfillment:', error)
+      logger.error('Error creating fulfillment:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -300,7 +301,7 @@ export function useSalesOrders() {
 
       return (data || []) as Fulfillment[]
     } catch (error: any) {
-      console.error('Error loading fulfillments:', error)
+      logger.error('Error loading fulfillments:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -326,7 +327,7 @@ export function useSalesOrders() {
 
       return (data || []) as Customer[]
     } catch (error: any) {
-      console.error('Error searching customers:', error)
+      logger.error('Error searching customers:', error)
       return []
     }
   }
@@ -342,7 +343,7 @@ export function useSalesOrders() {
 
       return (data || []) as Customer[]
     } catch (error: any) {
-      console.error('Error loading customers:', error)
+      logger.error('Error loading customers:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -372,7 +373,7 @@ export function useSalesOrders() {
 
       return data as Customer
     } catch (error: any) {
-      console.error('Error creating customer:', error)
+      logger.error('Error creating customer:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -405,7 +406,7 @@ export function useSalesOrders() {
 
       return data as Customer
     } catch (error: any) {
-      console.error('Error updating customer:', error)
+      logger.error('Error updating customer:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -499,7 +500,7 @@ export function useSalesOrders() {
         incomingStock: incomingMap
       }
     } catch (error: any) {
-      console.error('Error loading order details:', error)
+      logger.error('Error loading order details:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -524,7 +525,7 @@ export function useSalesOrders() {
 
       return true
     } catch (error: any) {
-      console.error('Error updating line:', error)
+      logger.error('Error updating line:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -555,7 +556,7 @@ export function useSalesOrders() {
 
       return true
     } catch (error: any) {
-      console.error('Error deleting line:', error)
+      logger.error('Error deleting line:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -599,7 +600,7 @@ export function useSalesOrders() {
 
       return true
     } catch (error: any) {
-      console.error('Error adding product:', error)
+      logger.error('Error adding product:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -630,7 +631,7 @@ export function useSalesOrders() {
 
       return true
     } catch (error: any) {
-      console.error('Error reverting order:', error)
+      logger.error('Error reverting order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',

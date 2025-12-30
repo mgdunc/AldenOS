@@ -1,6 +1,7 @@
 import { useToast } from 'primevue/usetoast'
 import { supabase } from '@/lib/supabase'
 import type { ToastMessageOptions } from 'primevue/toast'
+import { logger } from '@/lib/logger'
 
 /**
  * Enhanced toast composable that logs errors to system_logs
@@ -41,7 +42,7 @@ export function useSystemToast() {
       })
     } catch (err) {
       // Silently fail to avoid infinite error loops
-      console.error('Failed to write toast to system_logs:', err)
+      logger.error('Failed to write toast to system_logs', err as Error)
     }
   }
 
@@ -51,7 +52,7 @@ export function useSystemToast() {
   const add = (options: ToastMessageOptions) => {
     // Log to database if error or warning
     if (options.severity === 'error' || options.severity === 'warn') {
-      logToastToDatabase(options).catch(console.error)
+      logToastToDatabase(options).catch(err => logger.error('Failed to log toast', err as Error))
     }
 
     // Show toast

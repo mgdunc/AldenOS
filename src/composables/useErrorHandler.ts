@@ -1,5 +1,6 @@
 import { useToast } from 'primevue/usetoast'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/logger'
 
 interface ErrorHandlerOptions {
   showToast?: boolean
@@ -35,9 +36,9 @@ export function useErrorHandler() {
       message = error
     }
 
-    // Log to console
+    // Log using logger
     if (log) {
-      console.error(`[Error${context ? ` in ${context}` : ''}]:`, error)
+      logger.error(`Error${context ? ` in ${context}` : ''}`, error instanceof Error ? error : new Error(String(error)))
     }
 
     // Log to database
@@ -102,7 +103,7 @@ export function useErrorHandler() {
       })
     } catch (err) {
       // Silently fail to avoid infinite error loops
-      console.error('Failed to write to system_logs:', err)
+      logger.error('Failed to write to system_logs', err as Error)
     }
   }
 

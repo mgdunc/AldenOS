@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { useInventoryStore } from '../store'
 import type { Product, ProductWithStock, ProductFilters, StockAdjustment } from '../types'
+import { logger } from '@/lib/logger'
 
 export function useInventory() {
   const toast = useToast()
@@ -51,7 +52,7 @@ export function useInventory() {
       store.setProducts(products)
       return products
     } catch (error: any) {
-      console.error('Error loading products:', error)
+      logger.error('Error loading products', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -86,7 +87,7 @@ export function useInventory() {
       store.setCurrentProduct(product)
       return product
     } catch (error: any) {
-      console.error('Error loading product:', error)
+      logger.error('Error loading product', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -121,7 +122,7 @@ export function useInventory() {
 
       return newProduct
     } catch (error: any) {
-      console.error('Error creating product:', error)
+      logger.error('Error creating product', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -157,7 +158,7 @@ export function useInventory() {
 
       return updated
     } catch (error: any) {
-      console.error('Error updating product:', error)
+      logger.error('Error updating product', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -190,7 +191,7 @@ export function useInventory() {
 
       return true
     } catch (error: any) {
-      console.error('Error deleting product:', error)
+      logger.error('Error deleting product', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -229,7 +230,7 @@ export function useInventory() {
 
       return true
     } catch (error: any) {
-      console.error('Error adjusting stock:', error)
+      logger.error('Error adjusting stock', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -256,7 +257,7 @@ export function useInventory() {
 
       return data || []
     } catch (error: any) {
-      console.error('Error searching products:', error)
+      logger.error('Error searching products', error)
       return []
     }
   }
@@ -272,7 +273,7 @@ export function useInventory() {
 
       return data || []
     } catch (error: any) {
-      console.error('Error loading locations:', error)
+      logger.error('Error loading locations', error)
       return []
     }
   }
@@ -288,7 +289,7 @@ export function useInventory() {
 
       return data || []
     } catch (error: any) {
-      console.error('Error loading suppliers:', error)
+      logger.error('Error loading suppliers', error)
       return []
     }
   }
@@ -301,7 +302,7 @@ export function useInventory() {
 
       return data
     } catch (error: any) {
-      console.error('Error loading product stats:', error)
+      logger.error('Error loading product stats', error)
       return null
     }
   }

@@ -12,6 +12,7 @@ import Tooltip from 'primevue/tooltip'
 
 import App from './App.vue'
 import router from './router'
+import { logger } from './lib/logger'
 
 const app = createApp(App)
 
@@ -28,14 +29,12 @@ app.use(PrimeVue, {
 app.directive('tooltip', Tooltip)
 
 app.config.errorHandler = (err, instance, info) => {
-    console.error('Global Error Handler:', err)
-    console.error('Info:', info)
-    // You could also send this to a logging service like Sentry
+    logger.error('Global Error Handler', err as Error, { info, instance: instance?.$?.type?.__name })
+    // Future: Send to error tracking service like Sentry
 }
 
-// Enable DevTools in production for internal debugging
-// @ts-ignore
-app.config.devtools = true
-app.config.performance = true
+// Enable DevTools only in development
+app.config.devtools = import.meta.env.DEV
+app.config.performance = import.meta.env.DEV
 
 app.mount('#app')

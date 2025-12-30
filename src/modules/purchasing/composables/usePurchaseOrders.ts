@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { usePurchasingStore } from '../store'
 import type { PurchaseOrder, PurchaseOrderLine, PurchaseOrderFilters, Supplier, InventoryReceipt } from '../types'
+import { logger } from '@/lib/logger'
 
 export function usePurchaseOrders() {
   const toast = useToast()
@@ -62,7 +63,7 @@ export function usePurchaseOrders() {
       store.setPurchaseOrders(pos)
       return pos
     } catch (error: any) {
-      console.error('Error loading purchase orders:', error)
+      logger.error('Error loading purchase orders:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -91,7 +92,7 @@ export function usePurchaseOrders() {
       store.setCurrentPurchaseOrder(po)
       return po
     } catch (error: any) {
-      console.error('Error loading purchase order:', error)
+      logger.error('Error loading purchase order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -146,7 +147,7 @@ export function usePurchaseOrders() {
       // Reload to get complete data
       return await loadPurchaseOrder(po.id)
     } catch (error: any) {
-      console.error('Error creating purchase order:', error)
+      logger.error('Error creating purchase order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -179,7 +180,7 @@ export function usePurchaseOrders() {
 
       return data as PurchaseOrder
     } catch (error: any) {
-      console.error('Error updating purchase order:', error)
+      logger.error('Error updating purchase order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -217,7 +218,7 @@ export function usePurchaseOrders() {
 
       return await loadPurchaseOrder(id)
     } catch (error: any) {
-      console.error('Error cancelling purchase order:', error)
+      logger.error('Error cancelling purchase order:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -249,7 +250,7 @@ export function usePurchaseOrders() {
 
       return data as InventoryReceipt
     } catch (error: any) {
-      console.error('Error creating receipt:', error)
+      logger.error('Error creating receipt:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -275,7 +276,7 @@ export function usePurchaseOrders() {
 
       return (data || []) as InventoryReceipt[]
     } catch (error: any) {
-      console.error('Error loading receipts:', error)
+      logger.error('Error loading receipts:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -302,7 +303,7 @@ export function usePurchaseOrders() {
       store.setSuppliers(suppliers)
       return suppliers
     } catch (error: any) {
-      console.error('Error loading suppliers:', error)
+      logger.error('Error loading suppliers:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -337,7 +338,7 @@ export function usePurchaseOrders() {
 
       return supplier
     } catch (error: any) {
-      console.error('Error creating supplier:', error)
+      logger.error('Error creating supplier:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -363,7 +364,7 @@ export function usePurchaseOrders() {
 
       return (data || []) as Supplier[]
     } catch (error: any) {
-      console.error('Error searching suppliers:', error)
+      logger.error('Error searching suppliers:', error)
       return []
     }
   }

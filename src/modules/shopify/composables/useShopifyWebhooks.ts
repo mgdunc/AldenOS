@@ -2,6 +2,7 @@ import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import type { ShopifyWebhook, ShopifyWebhookPayload } from '../types'
+import { logger } from '@/lib/logger'
 
 export function useShopifyWebhooks(integrationId: string) {
   const toast = useToast()
@@ -24,7 +25,7 @@ export function useShopifyWebhooks(integrationId: string) {
 
       webhooks.value = data?.settings?.webhooks || []
     } catch (error: any) {
-      console.error('Error fetching webhooks:', error)
+      logger.error('Error fetching webhooks:', error)
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -82,7 +83,7 @@ export function useShopifyWebhooks(integrationId: string) {
 
       return newWebhook
     } catch (error: any) {
-      console.error('Error registering webhook:', error)
+      logger.error('Error registering webhook:', error)
       toast.add({
         severity: 'error',
         summary: 'Registration Failed',
@@ -134,7 +135,7 @@ export function useShopifyWebhooks(integrationId: string) {
 
       return true
     } catch (error: any) {
-      console.error('Error deleting webhook:', error)
+      logger.error('Error deleting webhook:', error)
       toast.add({
         severity: 'error',
         summary: 'Deletion Failed',
@@ -164,7 +165,7 @@ export function useShopifyWebhooks(integrationId: string) {
         .update({ settings: newSettings })
         .eq('id', integrationId)
     } catch (error) {
-      console.error('Error updating webhooks in database:', error)
+      logger.error('Error updating webhooks in database:', error)
     }
   }
 
@@ -202,7 +203,7 @@ export function useShopifyWebhooks(integrationId: string) {
         detail: `Found ${webhooks.value.length} webhooks`
       })
     } catch (error: any) {
-      console.error('Error listing webhooks:', error)
+      logger.error('Error listing webhooks:', error)
       toast.add({
         severity: 'error',
         summary: 'Sync Failed',

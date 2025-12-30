@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 import type { RealtimeChannel, REALTIME_POSTGRES_CHANGES_LISTEN_EVENT } from '@supabase/supabase-js'
+import { logger } from '@/lib/logger'
 
 /**
  * Composable for managing Supabase Realtime subscriptions
@@ -48,7 +49,7 @@ export function useRealtime() {
         })
     } catch (e: any) {
       error.value = e.message
-      console.error('Realtime subscription error:', e)
+      logger.error('Realtime subscription error', e as Error)
     }
   }
 

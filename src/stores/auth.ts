@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
 import type { Session, User } from '@supabase/supabase-js'
 import { useRouter } from 'vue-router'
+import { logger } from '@/lib/logger'
 
 export const useAuthStore = defineStore('auth', () => {
   const session = ref<Session | null>(null)
@@ -22,12 +23,12 @@ export const useAuthStore = defineStore('auth', () => {
     if (initialized.value) return
     if (initPromise) return initPromise
     
-    console.log('Auth: Initializing...')
+    logger.debug('Auth: Initializing...')
     loading.value = true
     
     initPromise = (async () => {
       try {
-        console.log('Auth: Initializing via onAuthStateChange...')
+        logger.debug('Auth: Initializing via onAuthStateChange...')
         
         // Use onAuthStateChange to get the initial session. 
         // This is often more reliable than getSession() which can hang in some environments.
@@ -37,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
             let resolved = false
             
             supabase.auth.onAuthStateChange(async (event, _session) => {
-                console.log('Auth: State change', event)
+                logger.debug('Auth: State change', { event })
                 session.value = _session
                 user.value = _session?.user ?? null
                 
@@ -51,7 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
                 if (user.value) {
                     if (!profile.value) {
                         // Fetch profile in background
-                        fetchProfile().catch(err => console.error('Auth: Profile fetch failed', err))
+                        fetchProfile().catch(err => logger.error('Auth: Profile fetch failed', err))
                     }
                 } else {
                     profile.value = null
@@ -67,9 +68,9 @@ export const useAuthStore = defineStore('auth', () => {
         await Promise.race([initComplete, timeoutPromise])
 
       } catch (e) {
-        console.error('Auth: Initialization failed', e)
+        logger.error('Auth: Initialization failed', e as Error)
       } finally {
-        console.log('Auth: Initialization complete')
+        logger.debug('Auth: Initialization complete')
         loading.value = false
         initialized.value = true
         initPromise = null
