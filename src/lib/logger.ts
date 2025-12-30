@@ -287,17 +287,21 @@ class Logger {
   }
 
   /**
-   * Log a debug message (always logged to console in production)
+   * Log a debug message (only in development to reduce production overhead)
    */
   debug(message: string, context?: LogContext): void {
-    console.debug(`[DEBUG] ${message}`, context || '')
+    if (this.isDevelopment) {
+      console.debug(`[DEBUG] ${message}`, context || '')
+    }
   }
 
   /**
-   * Log an info message (always logged to console in production)
+   * Log an info message (only in development to reduce production overhead)
    */
   info(message: string, context?: LogContext): void {
-    console.info(`[INFO] ${message}`, context || '')
+    if (this.isDevelopment) {
+      console.info(`[INFO] ${message}`, context || '')
+    }
     // In production, you might want to send to analytics/monitoring
   }
 
