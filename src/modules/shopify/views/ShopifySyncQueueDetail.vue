@@ -507,7 +507,12 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Log Details Dialog -->
+    <div v-else class="text-center text-500 py-8">
+      <i class="pi pi-exclamation-triangle text-4xl mb-3 block text-orange-500"></i>
+      <div>Sync job not found</div>
+    </div>
+
+    <!-- Log Details Dialog (outside v-if/v-else chain) -->
     <Dialog 
       v-model:visible="showLogDialog" 
       header="Log Details" 
@@ -540,10 +545,5 @@ onUnmounted(() => {
         <Button label="Close" @click="showLogDialog = false" />
       </template>
     </Dialog>
-
-    <div v-else class="text-center text-500 py-8">
-      <i class="pi pi-exclamation-triangle text-4xl mb-3 block text-orange-500"></i>
-      <div>Sync job not found</div>
-    </div>
   </div>
 </template>
