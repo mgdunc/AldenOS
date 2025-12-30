@@ -319,14 +319,20 @@ serve(async (req: Request) => {
                 }
 
                 if (productId) {
-                  await supabase
+                  const { error: lineError } = await supabase
                     .from('sales_order_lines')
                     .insert({
                       sales_order_id: newOrder.id,
                       product_id: productId,
-                      quantity: lineItem.quantity,
+                      quantity_ordered: lineItem.quantity,
                       unit_price: parseFloat(lineItem.price) || 0
                     })
+                  
+                  if (lineError) {
+                    console.error(`[ORDER_SYNC] Failed to create line item for order #${order.order_number}:`, lineError)
+                  } else {
+                    console.log(`[ORDER_SYNC] Created line item: ${lineItem.title} (qty: ${lineItem.quantity})`)
+                  }
                 } else {
                   // Log unmatched line item
                   console.warn(`[ORDER_SYNC] Could not match product for line item: ${lineItem.title} (SKU: ${lineItem.sku}, Variant: ${lineItem.variant_id})`)
