@@ -36,6 +36,7 @@ import Message from 'primevue/message'
 import Calendar from 'primevue/calendar'
 import Textarea from 'primevue/textarea'
 import ProgressBar from 'primevue/progressbar'
+import Select from 'primevue/select'
 
 import { getStatusSeverity } from '@/lib/statusHelpers'
 import { useSalesOrder } from '@/modules/sales/composables/useSalesOrder'
@@ -83,6 +84,21 @@ const {
 const showNewLineDialog = ref(false) 
 const showAllocationDialog = ref(false)
 const selectedProductForAllocation = ref<any>(null)
+
+// Status options for dropdown
+const statusOptions = [
+    { label: 'New', value: 'new' },
+    { label: 'Draft', value: 'draft' },
+    { label: 'Confirmed', value: 'confirmed' },
+    { label: 'Awaiting Stock', value: 'awaiting_stock' },
+    { label: 'Reserved', value: 'reserved' },
+    { label: 'Picking', value: 'picking' },
+    { label: 'Packed', value: 'packed' },
+    { label: 'Partially Shipped', value: 'partially_shipped' },
+    { label: 'Shipped', value: 'shipped' },
+    { label: 'Completed', value: 'completed' },
+    { label: 'Cancelled', value: 'cancelled' }
+]
 
 // --- ALLOCATION LOGIC ---
 
@@ -163,6 +179,16 @@ const updateOrder = async () => {
     
     if (success) {
         toast.add({ severity: 'success', summary: 'Saved', detail: 'Address updated.' })
+    }
+}
+
+const updateStatus = async () => {
+    const success = await updateOrderComposable(orderId, {
+        status: order.value.status
+    })
+    
+    if (success) {
+        toast.add({ severity: 'success', summary: 'Saved', detail: 'Status updated.' })
     }
 }
 
@@ -430,7 +456,30 @@ onMounted(() => fetchOrderData())
                 <div class="flex align-items-center gap-3">
                     <Button icon="pi pi-arrow-left" text rounded @click="router.push('/sales')" v-tooltip="'Back to Orders'" />
                     <h1 class="text-3xl font-bold m-0 text-900">{{ order.order_number }}</h1>
-                    <Tag :value="order.status?.toUpperCase().replace('_', ' ')" :severity="getStatusSeverity(order.status)" class="text-sm font-bold px-3 py-1" />
+                    <Select 
+                        v-model="order.status" 
+                        :options="statusOptions" 
+                        optionLabel="label" 
+                        optionValue="value" 
+                        @change="updateStatus"
+                        class="w-auto"
+                    >
+                        <template #value="slotProps">
+                            <Tag 
+                                v-if="slotProps.value" 
+                                :value="slotProps.value.toUpperCase().replace('_', ' ')" 
+                                :severity="getStatusSeverity(slotProps.value)" 
+                                class="text-sm font-bold"
+                            />
+                        </template>
+                        <template #option="slotProps">
+                            <Tag 
+                                :value="slotProps.option.label.toUpperCase()" 
+                                :severity="getStatusSeverity(slotProps.option.value)" 
+                                class="text-xs"
+                            />
+                        </template>
+                    </Select>
                 </div>
                 <div class="flex flex-wrap gap-2 w-full md:w-auto">
                     <Button 
