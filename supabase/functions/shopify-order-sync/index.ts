@@ -13,41 +13,43 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // 1. Validate and setup Supabase Client
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-  let jobId: string | undefined
-  let integrationId: string | undefined
-  let page_info: string | undefined
-  let queueId: string | undefined
-
+  // Wrap entire function in try-catch to ensure CORS headers are always returned
   try {
-    const body = await req.json().catch(() => ({}))
-    jobId = body.jobId
-    integrationId = body.integrationId || body.integration_id
-    page_info = body.page_info
-    queueId = body.queueId
-    
-    console.log(`[ORDER_SYNC] Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
-  } catch (_e: any) {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), { 
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    })
-  }
+    // 1. Validate and setup Supabase Client
+    const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-  // Validate integrationId
-  if (!integrationId) {
-    console.error('[ORDER_SYNC] ERROR: integrationId is missing from request')
-    return new Response(
-      JSON.stringify({ error: "Integration ID is required" }),
-      { 
+    let jobId: string | undefined
+    let integrationId: string | undefined
+    let page_info: string | undefined
+    let queueId: string | undefined
+
+    try {
+      const body = await req.json().catch(() => ({}))
+      jobId = body.jobId
+      integrationId = body.integrationId || body.integration_id
+      page_info = body.page_info
+      queueId = body.queueId
+      
+      console.log(`[ORDER_SYNC] Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
+    } catch (_e: any) {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), { 
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
-      }
-    )
-  }
+      })
+    }
+
+    // Validate integrationId
+    if (!integrationId) {
+      console.error('[ORDER_SYNC] ERROR: integrationId is missing from request')
+      return new Response(
+        JSON.stringify({ error: "Integration ID is required" }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      )
+    }
 
   // Run the sync
   const runSync = async () => {
@@ -453,4 +455,19 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     }
   )
+  } catch (fatalError: any) {
+    // This catch block ensures CORS headers are returned even on fatal errors
+    console.error('[ORDER_SYNC] Fatal error:', fatalError.message || fatalError)
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: fatalError.message || 'Internal server error',
+        errorType: 'fatal'
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    )
+  }
 })

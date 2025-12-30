@@ -144,9 +144,14 @@ serve(async (req: Request) => {
     )
 
   } catch (error: any) {
-    console.error('[QUEUE] Processor error:', error)
+    // This catch block ensures CORS headers are returned even on fatal errors
+    console.error('[QUEUE] Processor error:', error.message || error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false,
+        error: error.message || 'Internal server error',
+        errorType: 'fatal'
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }

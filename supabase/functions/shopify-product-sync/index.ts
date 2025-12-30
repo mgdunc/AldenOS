@@ -14,9 +14,11 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // 1. Validate and setup Supabase Client
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  // Wrap entire function in try-catch to ensure CORS headers are always returned
+  try {
+    // 1. Validate and setup Supabase Client
+    const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
   let sync_id: string | undefined
   let jobId: string | undefined
@@ -468,4 +470,19 @@ serve(async (req: Request) => {
     JSON.stringify(result),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   )
+  } catch (fatalError: any) {
+    // This catch block ensures CORS headers are returned even on fatal errors
+    console.error('[SYNC] Fatal error:', fatalError.message || fatalError)
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: fatalError.message || 'Internal server error',
+        errorType: 'fatal'
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    )
+  }
 })
