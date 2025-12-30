@@ -39,11 +39,17 @@ export function getSupabaseEnv(): SupabaseEnv {
     )
   }
 
-  // Basic validation - ensure service key looks valid (Supabase keys are typically JWT tokens)
-  if (supabaseServiceKey.length < 100) {
+  // Basic validation - ensure service key looks valid
+  // Supabase uses two formats:
+  // 1. JWT tokens (200+ chars) - older format
+  // 2. Short keys starting with sb_secret_ (30+ chars) - newer format
+  const isJwtFormat = supabaseServiceKey.includes('.') && supabaseServiceKey.length > 100
+  const isShortFormat = supabaseServiceKey.startsWith('sb_secret_') && supabaseServiceKey.length > 30
+  
+  if (!isJwtFormat && !isShortFormat) {
     throw new Error(
-      'Invalid SUPABASE_SERVICE_ROLE_KEY format. ' +
-      'Service role keys should be JWT tokens (typically 200+ characters).'
+      `Invalid SUPABASE_SERVICE_ROLE_KEY format (length: ${supabaseServiceKey.length}). ` +
+      'Service role keys should be either JWT tokens (200+ chars) or short keys starting with sb_secret_.'
     )
   }
 
