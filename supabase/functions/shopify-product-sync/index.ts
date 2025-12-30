@@ -39,8 +39,8 @@ serve(async (req: Request) => {
 
     await logger.info('Product sync started')
 
-    // Get Shopify config from environment
-    const shopifyConfig = getShopifyConfig()
+    // Get Shopify config (env vars or database)
+    const shopifyConfig = await getShopifyConfig()
     const shopify = new ShopifyClient(shopifyConfig)
 
     // Update queue status if provided
