@@ -203,16 +203,77 @@ const runQueueItem = async (item: any) => {
       detail: `Starting ${getSyncTypeLabel(item.sync_type)} sync...`
     })
 
-    // Invoke the sync function directly
-    const { data, error } = await supabase.functions.invoke(functionName, {
-      body: {
-        integrationId: item.integration_id,
-        queueId: item.id,
-        metadata: item.metadata
+    // Invoke the sync function directly with retry logic for network errors
+    let response
+    let lastError: any = null
+    const maxRetries = 2
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        response = await supabase.functions.invoke(functionName, {
+          body: {
+            integrationId: item.integration_id,
+            queueId: item.id,
+            metadata: item.metadata
+          }
+        })
+        lastError = null
+        break // Success, exit retry loop
+      } catch (retryError: any) {
+        lastError = retryError
+        const isNetworkError = 
+          retryError?.name === 'FunctionsFetchError' ||
+          retryError?.message?.toLowerCase().includes('failed to send') ||
+          retryError?.message?.toLowerCase().includes('network') ||
+          retryError?.message?.toLowerCase().includes('fetch failed')
+        
+        // Only retry on network errors, not on application errors
+        if (isNetworkError && attempt < maxRetries) {
+          logger.warn(`Network error on attempt ${attempt + 1}/${maxRetries + 1}, retrying...`, {
+            functionName,
+            attempt: attempt + 1,
+            error: retryError.message
+          })
+          // Wait before retry (exponential backoff: 1s, 2s)
+          await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000))
+          continue
+        } else {
+          // Not a network error or max retries reached, throw
+          throw retryError
+        }
       }
-    })
+    }
+    
+    // If we still have an error after retries, throw it
+    if (lastError) {
+      throw lastError
+    }
+    
+    // Response should be defined at this point
+    if (!response) {
+      throw new Error('Failed to get response from Edge Function after retries')
+    }
+    
+    const { data, error } = response
 
-    if (error) throw error
+    if (error) {
+      // Check for network errors and provide better error messages
+      const errorName = error.name || ''
+      const errorMsg = error.message?.toLowerCase() || ''
+      
+      if (
+        errorName === 'FunctionsFetchError' ||
+        errorMsg.includes('failed to send a request') ||
+        errorMsg.includes('fetch failed') ||
+        errorMsg.includes('network error')
+      ) {
+        throw new Error(
+          `Network error: Unable to reach Edge Function '${functionName}'. ` +
+          `Please check your internet connection and try again.`
+        )
+      }
+      throw error
+    }
 
     toast.add({
       severity: 'success',
