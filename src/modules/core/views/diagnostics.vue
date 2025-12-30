@@ -203,8 +203,14 @@ const testEdgeFunction = async () => {
     logger.debug('Testing Edge Function', { functionName: testFunctionName.value })
     
     const startTime = Date.now()
+    
+    // Try invoking with explicit headers
     const { data, error } = await supabase.functions.invoke(testFunctionName.value, {
-      body: { test: true }
+      body: { test: true },
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+      }
     })
     const duration = Date.now() - startTime
     
