@@ -269,8 +269,10 @@ serve(async (req: Request) => {
               errorCount++
             } else {
               updatedCount++
-              await logger.debug(`Updated order #${order.order_number}`, { 
+              await logger.info(`Updated order #${order.order_number || order.name}`, { 
                 orderId: existingOrder.id, 
+                shopifyOrderId: order.id,
+                shopifyOrderNumber: order.name || order.order_number,
                 status: newStatus,
                 previousStatus: existingOrder.status 
               })
@@ -476,7 +478,11 @@ serve(async (req: Request) => {
             }
 
             createdCount++
-            await logger.debug(`Created order #${order.order_number}`, { orderId: newOrder?.id })
+            await logger.info(`Created order #${order.order_number || order.name}`, { 
+              orderId: newOrder?.id, 
+              shopifyOrderId: order.id,
+              shopifyOrderNumber: order.name || order.order_number 
+            })
           }
 
           processedCount++
