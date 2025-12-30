@@ -69,6 +69,7 @@ const fulfillments = ref<any[]>([])
 const incomingStock = ref<any>({}) 
 const processing = ref(false)
 const orderId = route.params.id as string
+const shopifyDomain = ref<string | null>(null)
 
 // Use Composable
 const { 
@@ -167,6 +168,20 @@ const fetchOrderData = async () => {
     lines.value = result.lines
     fulfillments.value = result.fulfillments
     incomingStock.value = result.incomingStock
+    
+    // Fetch Shopify domain if this is a Shopify order
+    if (result.order?.shopify_order_id) {
+        const { data: integrations } = await supabase
+            .from('integrations')
+            .select('settings')
+            .eq('provider', 'shopify')
+            .limit(1)
+            .single()
+        
+        if (integrations?.settings?.shop_url) {
+            shopifyDomain.value = integrations.settings.shop_url
+        }
+    }
 }
 
 // --- ACTIONS ---
@@ -544,19 +559,41 @@ onMounted(() => fetchOrderData())
             </div>
 
             <div class="grid">
-                <div class="col-12 md:col-3">
+                <div class="col-6 md:col-2">
+                    <div class="surface-50 p-3 border-round h-full">
+                        <span class="text-500 text-sm font-medium block mb-2">Source</span>
+                        <div class="flex align-items-center gap-2">
+                            <Tag 
+                                :value="(order.source || 'manual').toUpperCase()" 
+                                :severity="order.source === 'shopify' ? 'success' : 'secondary'" 
+                                :icon="order.source === 'shopify' ? 'pi pi-shopping-bag' : 'pi pi-pencil'"
+                            />
+                            <a 
+                                v-if="order.shopify_order_id && shopifyDomain" 
+                                :href="`https://${shopifyDomain}/admin/orders/${order.shopify_order_id}`" 
+                                target="_blank"
+                                class="text-primary"
+                                v-tooltip.top="'View in Shopify'"
+                            >
+                                <i class="pi pi-external-link"></i>
+                            </a>
+                        </div>
+                        <div v-if="order.shopify_order_number" class="text-xs text-500 mt-1">{{ order.shopify_order_number }}</div>
+                    </div>
+                </div>
+                <div class="col-6 md:col-3">
                     <div class="surface-50 p-3 border-round h-full">
                         <span class="text-500 text-sm font-medium block mb-2">Customer</span>
-                        <div class="text-xl font-bold text-900">{{ order.customer_name || 'No Customer' }}</div>
+                        <div class="text-lg font-bold text-900">{{ order.customer_name || 'No Customer' }}</div>
                     </div>
                 </div>
-                <div class="col-12 md:col-3">
+                <div class="col-6 md:col-2">
                     <div class="surface-50 p-3 border-round h-full">
                         <span class="text-500 text-sm font-medium block mb-2">Order Date</span>
-                        <div class="text-lg font-semibold text-900">{{ formatDate(order.created_at) }}</div>
+                        <div class="text-base font-semibold text-900">{{ formatDate(order.created_at) }}</div>
                     </div>
                 </div>
-                <div class="col-12 md:col-3">
+                <div class="col-6 md:col-3">
                     <div class="surface-50 p-3 border-round h-full">
                         <span class="text-500 text-sm font-medium block mb-2">Expected Dispatch</span>
                         <div class="flex gap-2 align-items-center">
@@ -565,10 +602,10 @@ onMounted(() => fetchOrderData())
                         </div>
                     </div>
                 </div>
-                <div class="col-12 md:col-3">
+                <div class="col-12 md:col-2">
                     <div class="surface-50 p-3 border-round h-full flex flex-column justify-content-between">
-                        <span class="text-500 text-sm font-medium block">Total Amount</span>
-                        <div class="text-3xl font-bold text-primary text-right">{{ formatCurrency(calculatedTotal) }}</div>
+                        <span class="text-500 text-sm font-medium block">Total</span>
+                        <div class="text-2xl font-bold text-primary text-right">{{ formatCurrency(calculatedTotal) }}</div>
                     </div>
                 </div>
             </div>

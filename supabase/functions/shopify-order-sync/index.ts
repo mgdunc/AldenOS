@@ -368,6 +368,8 @@ serve(async (req: Request) => {
               .from('sales_orders')
               .insert({
                 shopify_order_id: order.id,
+                shopify_order_number: order.name || order.order_number?.toString() || null,
+                source: 'shopify',
                 customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : null,
                 customer_id: customerId,
                 status: mapOrderStatusForNew(),

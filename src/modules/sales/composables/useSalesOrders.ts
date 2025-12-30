@@ -443,7 +443,7 @@ export function useSalesOrders() {
       const [orderRes, fulfillRes, linesRes] = await Promise.all([
         supabase
           .from('sales_orders')
-          .select('*, billing_address, shipping_address')
+          .select('*')
           .eq('id', orderId)
           .single(),
         supabase
