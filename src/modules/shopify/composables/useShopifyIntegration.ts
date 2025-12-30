@@ -219,7 +219,7 @@ export function useShopifyIntegration() {
         throw new Error(data?.error || 'Connection failed')
       }
     } catch (error: any) {
-      console.error('Connection test failed:', error)
+      logger.error('Connection test failed', error)
       toast.add({ 
         severity: 'error', 
         summary: 'Connection Failed', 

@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
+import { getSupabaseEnv } from "../_shared/env.ts"
 
 console.log("Sync Queue Processor Started")
 
@@ -10,9 +11,9 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  // Validate and setup Supabase Client
+  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
   try {
     // 1. Fetch pending queue items (priority order)

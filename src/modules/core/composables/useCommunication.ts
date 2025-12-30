@@ -1,6 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
+import { logger } from '@/lib/logger'
 
 export interface TimelineEvent {
     id: string
@@ -32,7 +33,7 @@ export function useCommunication(entityId: string, entityType: 'product' | 'sale
             .order('created_at', { ascending: false })
 
         if (error) {
-            console.error('Error fetching timeline:', error)
+            logger.error('Error fetching timeline', error)
             toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load timeline' })
         } else {
             // 2. Enrich with User Emails (for notes)
@@ -87,7 +88,7 @@ export function useCommunication(entityId: string, entityType: 'product' | 'sale
         const { data, error } = await supabase.from('notes').insert(payload).select().single()
 
         if (error) {
-            console.error('Error posting note:', error)
+            logger.error('Error posting note', error)
             toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to post note' })
         } else {
             // Optimistic update / Manual append

@@ -1,15 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts"
+import { getSupabaseEnv } from "../_shared/env.ts"
 
 console.log("Shopify Webhook Function Started")
 
 serve(async (req) => {
   try {
-    // 1. Create Supabase Client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // 1. Validate and get environment variables
+    const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
     // 2. Get Headers
     const topic = req.headers.get('X-Shopify-Topic')

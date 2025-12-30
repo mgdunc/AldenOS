@@ -16,6 +16,7 @@ import { formatCurrency } from '@/lib/formatCurrency'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { FilterMatchMode } from '@primevue/core/api'
+import { logger } from '@/lib/logger'
 
 // Components
 import Dialog from 'primevue/dialog'
@@ -94,7 +95,7 @@ const fetchTableProducts = async () => {
     const { data, error } = await query
 
     if (error) {
-        console.error(error)
+        logger.error('Query error', error)
         toast.add({ severity: 'error', summary: 'Query Error', detail: error.message })
     } else {
         // The view returns flat data, so we don't need to map/reduce snapshots anymore

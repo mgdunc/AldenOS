@@ -2,6 +2,7 @@
 import { ref, onErrorCaptured, computed } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import { logger } from '@/lib/logger'
 
 interface ErrorInfo {
   message: string
@@ -20,7 +21,7 @@ const errorCount = ref(0)
 const hasError = computed(() => error.value !== null)
 
 onErrorCaptured((err: any) => {
-  console.error('Error boundary caught:', err)
+  logger.error('Error boundary caught', err as Error)
   
   error.value = {
     message: err.message || 'An unexpected error occurred',

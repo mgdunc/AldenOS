@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/logger'
 
 const props = defineProps<{
   integrationId?: string
@@ -42,7 +43,7 @@ const loadStats = async () => {
       }
     }
   } catch (error: any) {
-    console.error('Error loading sync health stats:', error)
+    logger.error('Error loading sync health stats', error)
   } finally {
     loading.value = false
   }

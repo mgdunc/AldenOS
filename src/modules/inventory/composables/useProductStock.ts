@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/logger'
 
 export function useProductStock() {
     const loading = ref(false)
@@ -68,14 +69,14 @@ export function useProductStock() {
 
             const [allocRes, poRes] = await Promise.all([allocQuery, poQuery])
             
-            if (allocRes.error) console.error('Error fetching allocations:', allocRes.error)
-            if (poRes.error) console.error('Error fetching POs:', poRes.error)
+            if (allocRes.error) logger.error('Error fetching allocations', allocRes.error)
+            if (poRes.error) logger.error('Error fetching POs', poRes.error)
 
             allOrderLines.value = allocRes.data || []
             incomingLines.value = poRes.data || []
 
         } catch (e: any) {
-            console.error('Stock fetch error:', e)
+            logger.error('Stock fetch error', e)
             error.value = e.message
         } finally {
             loading.value = false

@@ -8,6 +8,7 @@ import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { FilterMatchMode } from '@primevue/core/api'
+import { logger } from '@/lib/logger'
 
 // PrimeVue Components
 import DataTable from 'primevue/datatable'
@@ -90,7 +91,7 @@ const fetchLedger = async () => {
         .limit(500)
 
     if (error) {
-        console.error('Error fetching ledger:', error)
+        logger.error('Error fetching ledger', error)
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load ledger.' })
     } else {
         ledger.value = data || []

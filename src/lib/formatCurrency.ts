@@ -1,4 +1,5 @@
 import { getCurrencyCode } from '@/config/app'
+import { logger } from './logger'
 
 export function formatCurrency(val: number | string | null | undefined): string {
   if (val === null || val === undefined || val === '') return '-'
@@ -10,7 +11,7 @@ export function formatCurrency(val: number | string | null | undefined): string 
   try {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: getCurrencyCode() }).format(num)
   } catch (e) {
-    console.error('Error formatting currency:', e)
+    logger.error('Error formatting currency', e as Error)
     return '-'
   }
 }

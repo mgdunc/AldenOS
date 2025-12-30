@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { logger } from '@/lib/logger'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
@@ -37,7 +38,7 @@ const loadQueueItem = async () => {
     if (error) throw error
     queueItem.value = data
   } catch (error: any) {
-    console.error('Error loading queue item:', error)
+      logger.error('Error loading queue item:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -60,7 +61,7 @@ const loadLogs = async () => {
     if (error) throw error
     logs.value = data || []
   } catch (error: any) {
-    console.error('Error loading logs:', error)
+      logger.error('Error loading logs:', error)
   }
 }
 
@@ -142,7 +143,7 @@ const cancelSync = async () => {
       detail: 'Sync has been cancelled'
     })
   } catch (error: any) {
-    console.error('Error cancelling sync:', error)
+      logger.error('Error cancelling sync:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -172,7 +173,7 @@ const retrySync = async () => {
       detail: 'Sync has been queued for retry'
     })
   } catch (error: any) {
-    console.error('Error retrying sync:', error)
+      logger.error('Error retrying sync:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

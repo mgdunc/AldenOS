@@ -7,6 +7,7 @@ import { useInventory } from '../composables/useInventory'
 import { useResponsive } from '@/composables/useResponsive'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import type { ProductFilters } from '../types'
+import { logger } from '@/lib/logger'
 
 // Centralized Dialog Components
 import ProductInventoryDialog from '@/modules/inventory/components/ProductInventoryDialog.vue' 
@@ -104,7 +105,7 @@ const fetchProducts = async () => {
 
     const { data, count, error } = await query
     if (error) {
-        console.error(error)
+        logger.error('Error loading products', error)
     } else {
         totalRecords.value = count || 0
         

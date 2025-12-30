@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useImportMapper } from '../composables/useImportMapper'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
+import { logger } from '@/lib/logger'
 
 // PrimeVue
 import Button from 'primevue/button'
@@ -121,7 +122,7 @@ const commitImport = async () => {
         toast.add({ severity: 'success', summary: 'Success', detail: 'Import processed' })
 
     } catch (e: any) {
-        console.error(e)
+        logger.error('Import failed', e)
         toast.add({ severity: 'error', summary: 'Import Failed', detail: e.message })
     } finally {
         importing.value = false

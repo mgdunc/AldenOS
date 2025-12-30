@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
+import { logger } from '@/lib/logger'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -30,7 +31,7 @@ const fetchUnmatched = async () => {
         .order('created_at', { ascending: false })
         
     if (error) {
-        console.error('Error fetching unmatched:', error)
+        logger.error('Error fetching unmatched:', error)
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load unmatched products' })
     } else {
         unmatchedProducts.value = data || []
@@ -54,7 +55,7 @@ const importSelected = async () => {
     })
     
     if (error) {
-        console.error('Import error:', error)
+        logger.error('Import error', error)
         toast.add({ severity: 'error', summary: 'Import Failed', detail: error.message })
     } else {
         toast.add({ severity: 'success', summary: 'Import Successful', detail: `Imported ${data} products.` })

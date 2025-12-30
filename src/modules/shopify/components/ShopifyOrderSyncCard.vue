@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
+import { logger } from '@/lib/logger'
 import Button from 'primevue/button'
 import ProgressBar from 'primevue/progressbar'
 import DataTable from 'primevue/datatable'
@@ -160,7 +161,7 @@ const syncOrders = async () => {
     toast.add({ severity: 'info', summary: 'Sync Started', detail: 'The sync process has started in the background.', life: 3000 })
 
   } catch (err: any) {
-    console.error('Sync Error Details:', err)
+    logger.error('Sync Error Details', err)
     let msg = err.message || 'Unknown error'
     
     if (err.context && err.context.json) {

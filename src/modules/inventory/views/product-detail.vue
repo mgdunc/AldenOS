@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { useInventory } from '../composables/useInventory'
+import { logger } from '@/lib/logger'
 
 // Custom Components
 import StockAdjustDialog from '@/modules/inventory/components/StockAdjustDialog.vue'
@@ -184,7 +185,7 @@ const loadData = async () => {
             totalOnOrder.value = incomingStock.value.reduce((sum, line) => sum + (line.quantity_ordered - (line.quantity_received || 0)), 0)
         }
     } catch (e) {
-        console.error(e)
+        logger.error('Failed to load product data', e as Error)
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load product data' })
     } finally {
         loading.value = false
@@ -253,7 +254,7 @@ const onFileSelect = async (event: Event) => {
             })
 
         if (uploadError) {
-            console.error('Upload error:', uploadError)
+            logger.error('Upload error', uploadError)
             throw new Error(uploadError.message || 'Failed to upload file')
         }
 
@@ -273,7 +274,7 @@ const onFileSelect = async (event: Event) => {
         toast.add({ severity: 'success', summary: 'Uploaded', detail: 'Image uploaded successfully' })
         
     } catch (e: any) {
-        console.error('Upload error:', e)
+        logger.error('Upload error', e)
         toast.add({ 
             severity: 'error', 
             summary: 'Upload Failed', 

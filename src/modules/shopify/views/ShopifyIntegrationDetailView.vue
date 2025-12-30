@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useShopifyStore } from '../store'
 import { useShopifyIntegration } from '../composables/useShopifyIntegration'
 import { useShopifySync } from '../composables/useShopifySync'
+import { logger } from '@/lib/logger'
 import ShopifyIntegrationCard from '../components/ShopifyIntegrationCard.vue'
 import ShopifyWebhooksCard from '../components/ShopifyWebhooksCard.vue'
 import ShopifyUnmatchedProducts from '../components/ShopifyUnmatchedProducts.vue'
@@ -30,33 +31,99 @@ const isNew = computed(() => integrationId.value === 'new')
 const integration = ref<any>(null)
 const syncMenu = ref()
 
-// Sync composables - only initialize when we have a valid integrationId
-const productSync = computed(() => {
-  if (isNew.value || !integrationId.value) return null
-  return useShopifySync(integrationId.value, 'product_sync')
-})
+// Sync composables - stored as refs 
+// We initialize them once on mount and clean up on unmount
+const productSync = ref<ReturnType<typeof useShopifySync> | null>(null)
+const orderSync = ref<ReturnType<typeof useShopifySync> | null>(null)
 
-const orderSync = computed(() => {
-  if (isNew.value || !integrationId.value) return null
-  return useShopifySync(integrationId.value, 'order_sync')
-})
+// Local reactive state for button - directly watched from composables
+const productSyncing = ref(false)
+const orderSyncing = ref(false)
 
-const isSyncing = computed(() => {
-  return productSync.value?.syncing.value || orderSync.value?.syncing.value
-})
+// Watch composable syncing state and copy to local refs
+// This ensures Vue reactivity tracks the changes properly
+watch(
+  () => productSync.value?.syncing.value,
+  (val) => { productSyncing.value = val ?? false },
+  { immediate: true }
+)
+
+watch(
+  () => orderSync.value?.syncing.value,
+  (val) => { orderSyncing.value = val ?? false },
+  { immediate: true }
+)
+
+// Initialize sync composables when we have a valid integrationId
+let lastInitializedId: string | null = null
+
+const initSyncComposables = () => {
+  const currentId = integrationId.value
+  
+  // Guard against double initialization for the same ID
+  if (currentId === lastInitializedId) {
+    logger.debug('[ShopifyIntegrationDetailView] initSyncComposables skipped - same ID:', currentId)
+    return
+  }
+  
+  logger.debug('[ShopifyIntegrationDetailView] initSyncComposables for ID:', { currentId, previous: lastInitializedId })
+  
+  // Cleanup existing if any
+  productSync.value?.cleanup()
+  orderSync.value?.cleanup()
+  
+  if (!isNew.value && currentId) {
+    lastInitializedId = currentId
+    productSync.value = useShopifySync(currentId, 'product_sync')
+    orderSync.value = useShopifySync(currentId, 'order_sync')
+    // Manually init since we're creating outside the original setup context
+    productSync.value.init()
+    orderSync.value.init()
+    logger.debug('[ShopifyIntegrationDetailView] Sync composables initialized, syncing states:', 
+      productSync.value.syncing.value, orderSync.value.syncing.value)
+  } else {
+    lastInitializedId = null
+    productSync.value = null
+    orderSync.value = null
+  }
+}
+
+// Track syncing state reactively
+const isSyncing = computed(() => productSyncing.value || orderSyncing.value)
+
+// Direct sync trigger functions for menu commands
+const triggerProductSync = () => {
+  logger.debug('[ShopifyIntegrationDetailView] triggerProductSync called')
+  logger.debug('[ShopifyIntegrationDetailView] productSync.value:', { productSync: productSync.value })
+  if (productSync.value) {
+    logger.debug('[ShopifyIntegrationDetailView] Calling startSync...')
+    productSync.value.startSync()
+  } else {
+    logger.error('[ShopifyIntegrationDetailView] productSync is null!')
+  }
+}
+
+const triggerOrderSync = () => {
+  logger.debug('[ShopifyIntegrationDetailView] triggerOrderSync called')
+  if (orderSync.value) {
+    orderSync.value.startSync()
+  } else {
+    logger.error('[ShopifyIntegrationDetailView] orderSync is null!')
+  }
+}
 
 const syncMenuItems = computed(() => [
   {
     label: 'Sync Products',
     icon: 'pi pi-box',
-    command: () => productSync.value?.startSync(),
-    disabled: productSync.value?.syncing.value
+    command: triggerProductSync,
+    disabled: productSyncing.value
   },
   {
     label: 'Sync Orders',
     icon: 'pi pi-shopping-cart',
-    command: () => orderSync.value?.startSync(),
-    disabled: orderSync.value?.syncing.value
+    command: triggerOrderSync,
+    disabled: orderSyncing.value
   }
 ])
 
@@ -99,10 +166,17 @@ const goBack = () => {
 
 watch(() => route.params.id, () => {
   loadIntegration()
+  initSyncComposables()
 })
 
 onMounted(() => {
   loadIntegration()
+  initSyncComposables()
+})
+
+onUnmounted(() => {
+  productSync.value?.cleanup()
+  orderSync.value?.cleanup()
 })
 </script>
 

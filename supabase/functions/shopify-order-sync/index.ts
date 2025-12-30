@@ -1,263 +1,445 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 import { ShopifyClient } from '../_shared/shopify.ts'
+import { getSupabaseEnv } from '../_shared/env.ts'
+
+console.log("Shopify Order Sync Function Started")
 
 serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  // 1. Validate and setup Supabase Client
+  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+  let jobId: string | undefined
+  let integrationId: string | undefined
+  let page_info: string | undefined
+  let queueId: string | undefined
+
   try {
-    const { integration_id } = await req.json()
+    const body = await req.json().catch(() => ({}))
+    jobId = body.jobId
+    integrationId = body.integrationId || body.integration_id
+    page_info = body.page_info
+    queueId = body.queueId
+    
+    console.log(`[ORDER_SYNC] Received request - integrationId: ${integrationId}, jobId: ${jobId}, queueId: ${queueId}, page_info: ${page_info ? 'present' : 'none'}`)
+  } catch (_e: any) {
+    return new Response(JSON.stringify({ error: "Invalid request body" }), { 
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
+  }
 
-    if (!integration_id) {
-      return new Response(JSON.stringify({ error: 'integration_id is required' }), {
-        headers: { 'Content-Type': 'application/json' },
+  // Validate integrationId
+  if (!integrationId) {
+    console.error('[ORDER_SYNC] ERROR: integrationId is missing from request')
+    return new Response(
+      JSON.stringify({ error: "Integration ID is required" }),
+      { 
         status: 400,
-      })
-    }
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    )
+  }
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Logging helper
-    const log = async (message: string, level: 'info' | 'error' | 'success' | 'warning' = 'info') => {
-      console.log(`[SYNC ORDER] ${message}`)
-      await supabase.from('integration_logs').insert({
-        integration_id,
-        event_type: 'order_sync',
-        message,
-        level
-      })
-    }
-
-    // 1. Get Integration
-    const { data: integration, error: integrationError } = await supabase
-      .from('integrations')
-      .select('*')
-      .eq('id', integration_id)
-      .eq('provider', 'shopify')
-      .single()
-
-    if (integrationError || !integration) {
-      await log(`Integration not found: ${integrationError?.message}`, 'error')
-      return new Response(JSON.stringify({ error: 'Integration not found' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 404,
-      })
-    }
-
-    if (!integration.is_active) {
-      await log('Integration is not active', 'warning')
-      return new Response(JSON.stringify({ error: 'Integration is not active' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 400,
-      })
-    }
-
-    // 2. Create Sync Job
-    const { data: job, error: jobError } = await supabase
-      .from('integration_sync_jobs')
-      .insert({
-        integration_id,
-        integration_type: 'shopify',
-        job_type: 'order_sync',
-        status: 'running'
-      })
-      .select()
-      .single()
-
-    if (jobError || !job) {
-      await log(`Failed to create sync job: ${jobError?.message}`, 'error')
-      return new Response(JSON.stringify({ error: 'Failed to create sync job' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 500,
-      })
-    }
-
-    const jobId = job.id
-    await log(`Started order sync job ${jobId}`, 'info')
-
+  // Run the sync
+  const runSync = async () => {
     try {
-      // 3. Initialize Shopify Client
-      const { shop_url, access_token } = integration.settings
-      if (!shop_url || !access_token) {
-        throw new Error('Missing Shop URL or Access Token')
+      if (!integrationId) {
+        throw new Error("Integration ID is required")
       }
 
+      // Helper to update heartbeat
+      const updateHeartbeat = async () => {
+        if (queueId) {
+          await supabase.from('sync_queue').update({
+            last_heartbeat: new Date().toISOString()
+          }).eq('id', queueId)
+        }
+      }
+
+      // Check for concurrent sync
+      if (queueId) {
+        const { data: existingSync } = await supabase
+          .from('sync_queue')
+          .select('id')
+          .eq('integration_id', integrationId)
+          .eq('sync_type', 'order_sync')
+          .eq('status', 'processing')
+          .neq('id', queueId)
+          .maybeSingle()
+        
+        if (existingSync) {
+          console.log(`[ORDER_SYNC] Another sync already processing for integration ${integrationId}`)
+          return { success: false, error: 'Another sync is already in progress for this integration' }
+        }
+      }
+
+      // Get Integration Settings
+      const { data: integration, error: dbError } = await supabase
+        .from('integrations')
+        .select('id, settings')
+        .eq('id', integrationId)
+        .single()
+
+      if (dbError || !integration || !integration.settings) {
+        throw new Error("Shopify integration not configured")
+      }
+
+      // Helper to log events
+      const log = async (message: string, level = 'info', details = {}) => {
+        await supabase.from('integration_logs').insert({
+          integration_id: integration.id,
+          level,
+          event_type: 'order_sync',
+          message,
+          details: { ...details, jobId }
+        })
+      }
+
+      // Create job record if this is the first page
+      if (!jobId && !page_info) {
+        const { data: newJob, error: jobError } = await supabase
+          .from('integration_sync_jobs')
+          .insert({
+            integration_id: integration.id,
+            integration_type: 'shopify',
+            job_type: 'order_sync',
+            status: 'pending',
+            total_items: 0,
+            processed_items: 0,
+            queue_id: queueId || null
+          })
+          .select()
+          .single()
+        
+        if (jobError) {
+          console.error('[ORDER_SYNC] Failed to create job:', jobError)
+          await log(`Failed to create sync job: ${jobError.message}`, "error")
+        } else {
+          jobId = newJob.id
+          console.log(`[ORDER_SYNC] Created new job ${jobId}`)
+        }
+      }
+
+      // Set to running if first page
+      if (jobId && !page_info) {
+        await supabase.from('integration_sync_jobs').update({
+          status: 'running',
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }).eq('id', jobId)
+        console.log(`[ORDER_SYNC] Job ${jobId} marked as running`)
+        await log("Starting order sync...", "info")
+      }
+
+      const { shop_url, access_token } = integration.settings
+      if (!shop_url || !access_token) {
+        throw new Error("Missing Shop URL or Access Token")
+      }
+
+      // Initialize Shopify Client
       const shopify = new ShopifyClient({
         shopUrl: shop_url,
         accessToken: access_token
       })
 
-      // 4. Fetch Orders from Shopify
+      // Get Total Count (Only on first page)
+      if (!page_info) {
+        try {
+          const count = await shopify.getOrdersCount('any')
+          if (jobId) {
+            await supabase.from('integration_sync_jobs').update({
+              total_items: count,
+              updated_at: new Date().toISOString()
+            }).eq('id', jobId)
+          }
+          console.log(`[ORDER_SYNC] Total orders: ${count}`)
+        } catch (e) {
+          console.warn('[ORDER_SYNC] Could not get total count:', e)
+        }
+      }
+
+      // Fetch one page of orders
+      console.log(`[ORDER_SYNC] Fetching orders page...`)
+      await updateHeartbeat()
+      
+      const { orders, nextPageInfo } = await shopify.getOrdersPage(50, page_info, 'any')
+      console.log(`[ORDER_SYNC] Fetched ${orders.length} orders`)
+
       let processedCount = 0
-      let importedCount = 0
+      let matchedCount = 0
+      let createdCount = 0
       let skippedCount = 0
-      const errors: string[] = []
+      let errorCount = 0
 
-      await log('Fetching orders from Shopify...', 'info')
+      // Process each order
+      for (const order of orders) {
+        try {
+          // Check if order already exists in our system
+          const { data: existingOrder } = await supabase
+            .from('sales_orders')
+            .select('id, status, shopify_order_id')
+            .eq('shopify_order_id', order.id)
+            .maybeSingle()
 
-      // Get orders from last 30 days, status=any (open, closed, cancelled)
-      for await (const orders of shopify.getOrders(50, 'any')) {
-        await log(`Processing batch of ${orders.length} orders`, 'info')
-
-        for (const order of orders) {
-          processedCount++
-
-          try {
-            // Check if order already exists
-            const { data: existingOrder } = await supabase
-              .from('sales_orders')
-              .select('id')
-              .eq('shopify_order_id', order.id)
-              .single()
-
-            if (existingOrder) {
-              skippedCount++
-              await log(`Order #${order.order_number} already exists, skipping`, 'info')
-              continue
+          if (existingOrder) {
+            // Order exists - skip
+            matchedCount++
+            skippedCount++
+            console.log(`[ORDER_SYNC] Order #${order.order_number} already exists as ${existingOrder.id}`)
+          } else {
+            // Create new order
+            // Find or create customer
+            let customerId = null
+            if (order.customer) {
+              const customerEmail = order.customer.email
+              const customerName = `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim()
+              
+              if (customerEmail) {
+                // Try to find existing customer
+                const { data: existingCustomer } = await supabase
+                  .from('customers')
+                  .select('id')
+                  .eq('email', customerEmail)
+                  .maybeSingle()
+                
+                if (existingCustomer) {
+                  customerId = existingCustomer.id
+                } else {
+                  // Create new customer
+                  const { data: newCustomer } = await supabase
+                    .from('customers')
+                    .insert({
+                      name: customerName || 'Unknown',
+                      email: customerEmail,
+                      phone: order.customer.phone || null,
+                      shopify_customer_id: order.customer.id
+                    })
+                    .select('id')
+                    .single()
+                  
+                  if (newCustomer) {
+                    customerId = newCustomer.id
+                  }
+                }
+              }
             }
 
-            // Parse addresses
-            const shippingAddress = order.shipping_address ? {
-              name: `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim(),
-              company: order.shipping_address.company,
-              street: order.shipping_address.address1,
-              street2: order.shipping_address.address2,
-              city: order.shipping_address.city,
-              state: order.shipping_address.province,
-              zip: order.shipping_address.zip,
-              country: order.shipping_address.country,
-              phone: order.shipping_address.phone
-            } : null
+            // Map Shopify status to our status
+            let status = 'draft'
+            if (order.cancelled_at) {
+              status = 'cancelled'
+            } else if (order.fulfillment_status === 'fulfilled') {
+              status = 'completed'
+            } else if (order.fulfillment_status === 'partial') {
+              status = 'partially_shipped'
+            } else if (order.financial_status === 'paid' || order.financial_status === 'partially_paid') {
+              status = 'confirmed'
+            }
 
-            const billingAddress = order.billing_address ? {
-              name: `${order.billing_address.first_name || ''} ${order.billing_address.last_name || ''}`.trim(),
-              company: order.billing_address.company,
-              street: order.billing_address.address1,
-              street2: order.billing_address.address2,
-              city: order.billing_address.city,
-              state: order.billing_address.province,
-              zip: order.billing_address.zip,
-              country: order.billing_address.country,
-              phone: order.billing_address.phone
-            } : null
-
-            // Create Sales Order
+            // Create the sales order
             const { data: newOrder, error: orderError } = await supabase
               .from('sales_orders')
               .insert({
                 shopify_order_id: order.id,
-                order_number: `SHOP-${order.order_number}`,
                 customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : null,
-                customer_email: order.email,
-                customer_phone: order.customer?.phone,
-                shipping_address: shippingAddress,
-                billing_address: billingAddress,
-                status: order.fulfillment_status === 'fulfilled' ? 'fulfilled' : 'confirmed',
-                total_amount: parseFloat(order.total_price),
-                notes: `Imported from Shopify. Financial Status: ${order.financial_status}`
+                customer_id: customerId,
+                status: status,
+                total_amount: parseFloat(order.total_price) || 0,
+                shipping_address: order.shipping_address ? {
+                  name: order.shipping_address.name,
+                  address1: order.shipping_address.address1,
+                  address2: order.shipping_address.address2,
+                  city: order.shipping_address.city,
+                  province: order.shipping_address.province,
+                  country: order.shipping_address.country,
+                  zip: order.shipping_address.zip,
+                  phone: order.shipping_address.phone
+                } : null,
+                billing_address: order.billing_address ? {
+                  name: order.billing_address.name,
+                  address1: order.billing_address.address1,
+                  address2: order.billing_address.address2,
+                  city: order.billing_address.city,
+                  province: order.billing_address.province,
+                  country: order.billing_address.country,
+                  zip: order.billing_address.zip,
+                  phone: order.billing_address.phone
+                } : null
               })
-              .select()
+              .select('id')
               .single()
 
             if (orderError) {
-              errors.push(`Order #${order.order_number}: ${orderError.message}`)
-              await log(`Failed to create order #${order.order_number}: ${orderError.message}`, 'error')
+              console.error(`[ORDER_SYNC] Failed to create order #${order.order_number}:`, orderError)
+              errorCount++
+              processedCount++
               continue
             }
 
-            // Create Line Items
-            const lineItems = order.line_items.map((item: any) => {
-              // Try to find matching product by SKU
-              return {
-                sales_order_id: newOrder.id,
-                product_id: null, // Will need to match by SKU separately
-                quantity: item.quantity,
-                unit_price: parseFloat(item.price),
-                total_price: parseFloat(item.price) * item.quantity,
-                notes: item.sku ? `SKU: ${item.sku}` : null
-              }
-            })
+            // Create line items
+            if (newOrder && order.line_items) {
+              for (const lineItem of order.line_items) {
+                // Try to match product by SKU or Shopify variant ID
+                let productId = null
+                
+                if (lineItem.sku) {
+                  const { data: product } = await supabase
+                    .from('products')
+                    .select('id')
+                    .eq('sku', lineItem.sku)
+                    .maybeSingle()
+                  
+                  if (product) {
+                    productId = product.id
+                  }
+                }
 
-            if (lineItems.length > 0) {
-              const { error: linesError } = await supabase
-                .from('sales_order_lines')
-                .insert(lineItems)
+                // If no match by SKU, try by shopify_variant_id
+                if (!productId && lineItem.variant_id) {
+                  const { data: product } = await supabase
+                    .from('products')
+                    .select('id')
+                    .eq('shopify_variant_id', lineItem.variant_id)
+                    .maybeSingle()
+                  
+                  if (product) {
+                    productId = product.id
+                  }
+                }
 
-              if (linesError) {
-                errors.push(`Order #${order.order_number} lines: ${linesError.message}`)
-                await log(`Failed to create lines for order #${order.order_number}: ${linesError.message}`, 'warning')
+                if (productId) {
+                  await supabase
+                    .from('sales_order_lines')
+                    .insert({
+                      sales_order_id: newOrder.id,
+                      product_id: productId,
+                      quantity: lineItem.quantity,
+                      unit_price: parseFloat(lineItem.price) || 0
+                    })
+                } else {
+                  // Log unmatched line item
+                  console.warn(`[ORDER_SYNC] Could not match product for line item: ${lineItem.title} (SKU: ${lineItem.sku}, Variant: ${lineItem.variant_id})`)
+                }
               }
             }
 
-            importedCount++
-            await log(`Imported order #${order.order_number}`, 'success')
-
-          } catch (err: any) {
-            errors.push(`Order #${order.order_number}: ${err.message}`)
-            await log(`Error processing order #${order.order_number}: ${err.message}`, 'error')
+            createdCount++
+            console.log(`[ORDER_SYNC] Created order #${order.order_number} as ${newOrder?.id}`)
           }
-        }
 
-        // Update job progress
+          processedCount++
+
+          // Update heartbeat periodically
+          if (processedCount % 10 === 0) {
+            await updateHeartbeat()
+          }
+        } catch (e: any) {
+          console.error(`[ORDER_SYNC] Error processing order ${order.id}:`, e)
+          errorCount++
+          processedCount++
+        }
+      }
+
+      // Update job progress
+      if (jobId) {
+        // Get current progress
+        const { data: currentJob } = await supabase
+          .from('integration_sync_jobs')
+          .select('processed_items, matched_items, updated_items, error_count')
+          .eq('id', jobId)
+          .single()
+
+        const currentProcessed = currentJob?.processed_items || 0
+        const currentMatched = currentJob?.matched_items || 0
+        const currentErrors = currentJob?.error_count || 0
+
         await supabase.from('integration_sync_jobs').update({
-          processed_items: processedCount,
-          matched_items: importedCount
+          processed_items: currentProcessed + processedCount,
+          matched_items: currentMatched + matchedCount,
+          updated_items: (currentJob?.updated_items || 0) + skippedCount,
+          error_count: currentErrors + errorCount,
+          updated_at: new Date().toISOString()
         }).eq('id', jobId)
       }
 
-      // Update final job status
-      await supabase.from('integration_sync_jobs').update({
-        status: 'completed',
-        processed_items: processedCount,
-        matched_items: importedCount,
-        updated_items: skippedCount,
-        completed_at: new Date().toISOString(),
-        error_message: errors.length > 0 ? errors.join('; ') : null
-      }).eq('id', jobId)
+      // Determine if there are more pages
+      if (!nextPageInfo) {
+        // No more pages - mark job as complete
+        if (jobId) {
+          await supabase.from('integration_sync_jobs').update({
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          }).eq('id', jobId)
+        }
+        
+        // Update queue status
+        if (queueId) {
+          await supabase.from('sync_queue').update({
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          }).eq('id', queueId)
+        }
 
-      await log(`Order sync completed: ${importedCount} imported, ${skippedCount} skipped, ${processedCount} total`, 'success')
+        await log(`Order sync completed. Created: ${createdCount}, Matched: ${matchedCount}, Errors: ${errorCount}`, "success")
+        console.log(`[ORDER_SYNC] Sync complete!`)
+        
+        return { 
+          success: true, 
+          message: `Processed ${processedCount} orders. Created: ${createdCount}, Skipped: ${skippedCount}`,
+          jobId 
+        }
+      } else {
+        console.log(`[ORDER_SYNC] More pages available, returning nextPageInfo`)
+        return { 
+          success: true, 
+          nextPageInfo, 
+          jobId,
+          message: `Processed ${processedCount} orders this page`
+        }
+      }
 
-      return new Response(JSON.stringify({
-        success: true,
-        processed: processedCount,
-        imported: importedCount,
-        skipped: skippedCount,
-        errors: errors.length
-      }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 200,
-      })
-
-    } catch (syncError: any) {
-      console.error('[SYNC ORDER] Fatal error:', syncError)
+    } catch (error: any) {
+      console.error(`[ORDER_SYNC] Fatal error:`, error)
       
-      await supabase.from('integration_sync_jobs').update({
-        status: 'failed',
-        error_message: syncError.message,
-        completed_at: new Date().toISOString()
-      }).eq('id', jobId)
+      // Update job status to failed
+      if (jobId) {
+        await supabase.from('integration_sync_jobs').update({
+          status: 'failed',
+          error_message: error.message,
+          completed_at: new Date().toISOString()
+        }).eq('id', jobId)
+      }
 
-      await log(`Sync failed: ${syncError.message}`, 'error')
+      // Update queue status
+      if (queueId) {
+        await supabase.from('sync_queue').update({
+          status: 'failed',
+          error_message: error.message,
+          completed_at: new Date().toISOString()
+        }).eq('id', queueId)
+      }
 
-      return new Response(JSON.stringify({
-        error: syncError.message,
-        stack: syncError.stack
-      }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 500,
-      })
+      return { success: false, error: error.message }
     }
-
-  } catch (error: any) {
-    console.error('[SYNC ORDER] Request error:', error)
-    return new Response(JSON.stringify({
-      error: error.message,
-      stack: error.stack
-    }), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 500,
-    })
   }
+
+  // Run the sync
+  const result = await runSync()
+
+  return new Response(
+    JSON.stringify(result),
+    { 
+      status: result.success ? 200 : 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  )
 })

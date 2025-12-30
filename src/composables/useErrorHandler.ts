@@ -44,7 +44,8 @@ export function useErrorHandler() {
     // Log to database
     if (logToDatabase) {
       logErrorToDatabase(context || 'Frontend Error', message, error).catch(err => {
-        console.error('Failed to log error to database:', err)
+        // Use logger here is safe - it only logs to console, not database
+        logger.error('Failed to log error to database', err as Error)
       })
     }
 

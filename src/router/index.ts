@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { logger } from '@/lib/logger'
 
 // Module Routes
 import { routes as coreRoutes } from '@/modules/core/routes'
@@ -36,7 +37,7 @@ router.beforeEach(async (to, from, next) => {
     try {
       await authStore.initialize()
     } catch (error) {
-      console.error('Failed to initialize auth:', error)
+      logger.error('Failed to initialize auth', error as Error)
     }
   }
 

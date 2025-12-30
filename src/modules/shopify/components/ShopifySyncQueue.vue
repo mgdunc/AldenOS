@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { logger } from '@/lib/logger'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -28,7 +29,7 @@ const loadQueue = async () => {
     if (error) throw error
     queue.value = data || []
   } catch (error: any) {
-    console.error('Error loading queue:', error)
+      logger.error('Error loading queue:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -103,7 +104,7 @@ const cancelSync = async (id: string) => {
       detail: 'Sync has been cancelled'
     })
   } catch (error: any) {
-    console.error('Error cancelling sync:', error)
+      logger.error('Error cancelling sync:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -135,7 +136,7 @@ const retrySync = async (id: string) => {
       detail: 'Sync has been queued for retry'
     })
   } catch (error: any) {
-    console.error('Error retrying sync:', error)
+      logger.error('Error retrying sync:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -166,7 +167,7 @@ const resetStaleJobs = async () => {
       })
     }
   } catch (error: any) {
-    console.error('Error resetting stale jobs:', error)
+      logger.error('Error resetting stale jobs:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

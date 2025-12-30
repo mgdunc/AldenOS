@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { getStatusSeverity } from '@/lib/statusHelpers'
 import Dialog from 'primevue/dialog'
+import { logger } from '@/lib/logger'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -36,7 +37,7 @@ const fetchReservations = async () => {
         .in('sales_orders.status', ['reserved', 'picking', 'packed', 'partially_shipped'])
 
     if (error) {
-        console.error('Reserved Dialog Error:', error)
+        logger.error('Reserved Dialog Error', error)
         reservedLines.value = []
     } else if (data) {
         reservedLines.value = data.map((d: any) => ({

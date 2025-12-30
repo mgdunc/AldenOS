@@ -140,6 +140,43 @@ export class ShopifyClient {
     }
   }
 
+  async getOrdersCount(status = 'any'): Promise<number> {
+    const res = await this.fetch(`orders/count.json?status=${status}`);
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Failed to get orders count: ${res.status} ${text}`);
+    }
+    const data = await res.json();
+    return data.count;
+  }
+
+  async getOrdersPage(limit = 50, pageInfo?: string, status = 'any'): Promise<{ orders: any[], nextPageInfo: string | null }> {
+    let url = `orders.json?limit=${limit}&status=${status}`;
+    if (pageInfo) {
+        url = `orders.json?limit=${limit}&page_info=${pageInfo}`;
+    }
+    
+    const res = await this.fetch(url);
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Failed to fetch orders: ${res.status} ${text}`);
+    }
+    
+    const data = await res.json();
+    
+    let nextPageInfo = null;
+    const linkHeader = res.headers.get('Link');
+    if (linkHeader) {
+        const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        if (match) {
+            const nextUrl = new URL(match[1]);
+            nextPageInfo = nextUrl.searchParams.get('page_info');
+        }
+    }
+
+    return { orders: data.orders, nextPageInfo };
+  }
+
   // Placeholder for Inventory Levels
   async getInventoryLevels(inventoryItemIds: string[]) {
     const ids = inventoryItemIds.join(',');

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/logger'
 
 // PrimeVue Components
 import Dialog from 'primevue/dialog'
@@ -62,7 +63,7 @@ const fetchHistory = async (productId: string) => {
         .order('created_at', { ascending: false })
         .limit(25) 
 
-    if (error) console.error(error)
+    if (error) logger.error('Error loading inventory history', error)
     else history.value = data || []
     
     historyLoading.value = false

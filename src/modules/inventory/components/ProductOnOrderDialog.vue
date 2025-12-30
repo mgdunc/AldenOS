@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/formatDate'
 import Dialog from 'primevue/dialog'
+import { logger } from '@/lib/logger'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -33,7 +34,7 @@ const fetchIncoming = async () => {
         .in('purchase_orders.status', ['placed', 'partial_received'])
 
     if (error) {
-        console.error('On Order Dialog Error:', error)
+        logger.error('On Order Dialog Error', error)
         onOrderLines.value = []
     } else if (data) {
         onOrderLines.value = data.map((d: any) => ({

@@ -4,6 +4,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { ShopifyClient } from "../_shared/shopify.ts"
+import { getSupabaseEnv } from "../_shared/env.ts"
 
 console.log("Shopify Product Sync Function Started")
 
@@ -13,10 +14,9 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // 1. Setup Supabase Client
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  // 1. Validate and setup Supabase Client
+  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
   let sync_id: string | undefined
   let jobId: string | undefined

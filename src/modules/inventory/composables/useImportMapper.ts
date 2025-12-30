@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import Papa from 'papaparse'
 import ExcelJS from 'exceljs'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // --- TYPES ---
 export interface ImportField {
@@ -109,7 +110,7 @@ export function useImportMapper(mode: 'inventory' | 'products' | 'locations' = '
             // Auto-Map Columns
             smartMapColumns()
         } catch (e) {
-            console.error(e)
+            logger.error('Error parsing file', e as Error)
             throw e
         } finally {
             isParsing.value = false
