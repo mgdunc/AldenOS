@@ -288,6 +288,7 @@ serve(async (req: Request) => {
                 for (const lineItem of order.line_items) {
                   let productId = null
                   
+                  // Try to match product by SKU
                   if (lineItem.sku) {
                     const { data: product } = await supabase
                       .from('products')
@@ -297,6 +298,7 @@ serve(async (req: Request) => {
                     if (product) productId = product.id
                   }
                   
+                  // Try to match by Shopify variant ID
                   if (!productId && lineItem.variant_id) {
                     const { data: product } = await supabase
                       .from('products')
@@ -306,16 +308,20 @@ serve(async (req: Request) => {
                     if (product) productId = product.id
                   }
                   
-                  if (productId) {
-                    await supabase
-                      .from('sales_order_lines')
-                      .insert({
-                        sales_order_id: existingOrder.id,
-                        product_id: productId,
-                        quantity_ordered: lineItem.quantity,
-                        unit_price: parseFloat(lineItem.price) || 0
-                      })
-                  }
+                  // Always insert line item (with or without matched product)
+                  await supabase
+                    .from('sales_order_lines')
+                    .insert({
+                      sales_order_id: existingOrder.id,
+                      product_id: productId, // Can be null if not matched
+                      sku: lineItem.sku || null,
+                      product_name: lineItem.title || lineItem.name || null,
+                      shopify_line_item_id: lineItem.id?.toString() || null,
+                      shopify_variant_id: lineItem.variant_id?.toString() || null,
+                      shopify_product_id: lineItem.product_id?.toString() || null,
+                      quantity_ordered: lineItem.quantity,
+                      unit_price: parseFloat(lineItem.price) || 0
+                    })
                 }
               }
             }
@@ -440,24 +446,29 @@ serve(async (req: Request) => {
                   }
                 }
 
-                if (productId) {
-                  const { error: lineError } = await supabase
-                    .from('sales_order_lines')
-                    .insert({
-                      sales_order_id: newOrder.id,
-                      product_id: productId,
-                      quantity_ordered: lineItem.quantity,
-                      unit_price: parseFloat(lineItem.price) || 0
-                    })
-                  
-                  if (lineError) {
-                    console.error(`[ORDER_SYNC] Failed to create line item for order #${order.order_number}:`, lineError)
-                  } else {
-                    await logger.debug(`Created line item: ${lineItem.title}`, { qty: lineItem.quantity })
-                  }
+                // Always insert line item (with or without matched product)
+                const { error: lineError } = await supabase
+                  .from('sales_order_lines')
+                  .insert({
+                    sales_order_id: newOrder.id,
+                    product_id: productId, // Can be null if not matched
+                    sku: lineItem.sku || null,
+                    product_name: lineItem.title || lineItem.name || null,
+                    shopify_line_item_id: lineItem.id?.toString() || null,
+                    shopify_variant_id: lineItem.variant_id?.toString() || null,
+                    shopify_product_id: lineItem.product_id?.toString() || null,
+                    quantity_ordered: lineItem.quantity,
+                    unit_price: parseFloat(lineItem.price) || 0
+                  })
+                
+                if (lineError) {
+                  console.error(`[ORDER_SYNC] Failed to create line item for order #${order.order_number}:`, lineError)
                 } else {
-                  // Log unmatched line item
-                  console.warn(`[ORDER_SYNC] Could not match product for line item: ${lineItem.title} (SKU: ${lineItem.sku}, Variant: ${lineItem.variant_id})`)
+                  await logger.debug(`Created line item: ${lineItem.title}`, { 
+                    sku: lineItem.sku, 
+                    qty: lineItem.quantity,
+                    matched: !!productId 
+                  })
                 }
               }
             }

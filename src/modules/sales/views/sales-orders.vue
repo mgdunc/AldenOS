@@ -276,14 +276,14 @@ onMounted(fetchOrders)
                     <div class="p-3 surface-50 border-bottom-1 surface-border">
                         <span class="font-bold block mb-2 text-sm text-500">Order Contents ({{ data.lines?.length || 0 }} items)</span>
                         <DataTable v-if="data.lines?.length" :value="data.lines" size="small" class="p-datatable-sm">
-                            <Column field="products.sku" header="SKU" style="width: 120px">
+                            <Column field="sku" header="SKU" style="width: 120px">
                                 <template #body="{ data: line }">
-                                    <code class="text-sm">{{ line.products?.sku || '-' }}</code>
+                                    <code class="text-sm">{{ line.sku || line.products?.sku || '-' }}</code>
                                 </template>
                             </Column>
-                            <Column field="products.name" header="Product">
+                            <Column field="product_name" header="Product">
                                 <template #body="{ data: line }">
-                                    {{ line.products?.name || 'Unknown Product' }}
+                                    {{ line.product_name || line.products?.name || 'Unknown Product' }}
                                 </template>
                             </Column>
                             <Column field="quantity_ordered" header="Qty" style="width: 80px" class="text-center" />

@@ -29,10 +29,14 @@ export function useSalesOrders() {
           ),
           lines:sales_order_lines(
             id,
+            sku,
+            product_name,
             quantity_ordered,
             quantity_fulfilled,
             product_id,
-            products(sku, name)
+            shopify_line_item_id,
+            shopify_variant_id,
+            products(id, sku, name)
           )
         `)
         .order('created_at', { ascending: false })
