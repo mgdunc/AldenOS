@@ -212,20 +212,20 @@ watch(() => props.visible, (newVal) => {
                 </Column>
                 
                 <!-- Inventory Columns -->
-                <Column field="available" header="Available" style="width: 8rem" class="text-center">
+                <Column field="available" header="Available" sortable style="width: 8rem" class="text-center">
                     <template #body="{ data }">
                         <Tag :value="data.available" :severity="getStockSeverity(data.available)" />
                     </template>
                 </Column>
 
-                <Column field="net_required" header="Required" style="width: 8rem" class="text-center">
+                <Column field="net_required" header="Required" sortable style="width: 8rem" class="text-center">
                     <template #body="{ data }">
                         <span v-if="data.net_required > 0" class="text-red-500 font-bold">{{ data.net_required }}</span>
                         <span v-else class="text-300">-</span>
                     </template>
                 </Column>
 
-                <Column field="on_order" header="Incoming" style="width: 8rem" class="text-center">
+                <Column field="on_order" header="Incoming" sortable style="width: 8rem" class="text-center">
                     <template #body="{ data }">
                         <span v-if="data.on_order > 0" class="text-blue-600 font-bold">{{ data.on_order }}</span>
                         <span v-else class="text-300">-</span>
