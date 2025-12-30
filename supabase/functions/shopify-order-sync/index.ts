@@ -238,8 +238,7 @@ serve(async (req: Request) => {
                   country: order.billing_address.country,
                   zip: order.billing_address.zip,
                   phone: order.billing_address.phone
-                } : null,
-                updated_at: new Date().toISOString()
+                } : null
               })
               .eq('id', existingOrder.id)
             
