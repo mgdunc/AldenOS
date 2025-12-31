@@ -78,6 +78,7 @@ serve(async (req: Request) => {
               status: mapShopifyStatus(order, existingOrder.status),
               total_amount: parseFloat(order.total_price) || 0,
               customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : null,
+              order_date: order.created_at, // Original Shopify order date
               // Shipping address
               shipping_name: order.shipping_address?.name || null,
               shipping_company: order.shipping_address?.company || null,
@@ -124,6 +125,7 @@ serve(async (req: Request) => {
               shopify_order_number: order.name,
               source: 'shopify',
               status: 'new',
+              order_date: order.created_at, // Original Shopify order date
               total_amount: parseFloat(order.total_price) || 0,
               customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : null,
               // Shipping address

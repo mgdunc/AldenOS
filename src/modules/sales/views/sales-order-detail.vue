@@ -590,7 +590,7 @@ onMounted(() => fetchOrderData())
                 <div class="col-6 md:col-2">
                     <div class="surface-50 p-3 border-round h-full">
                         <span class="text-500 text-sm font-medium block mb-2">Order Date</span>
-                        <div class="text-base font-semibold text-900">{{ formatDate(order.created_at) }}</div>
+                        <div class="text-base font-semibold text-900">{{ formatDate(order.order_date || order.created_at) }}</div>
                     </div>
                 </div>
                 <div class="col-6 md:col-3">
