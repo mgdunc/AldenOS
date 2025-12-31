@@ -100,18 +100,37 @@ serve(async (req) => {
       console.log('[supplier-stock-import] First row columns:', Object.keys(rows[0]))
 
       // Get all products with supplier_sku for matching
-      // Explicitly set limit to avoid Supabase's default 1000 row limit
-      const { data: products, error: productsError, count } = await supabase
-        .from('products')
-        .select('id, sku, name, supplier_sku, supplier_id', { count: 'exact' })
-        .limit(20000) // Set explicit high limit
+      // Fetch in batches to avoid Supabase's 1000 row limit
+      let allProducts: any[] = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
 
-      if (productsError) {
-        console.error('[supplier-stock-import] Failed to fetch products:', productsError)
-        throw new Error('Failed to fetch products for matching')
+      while (hasMore) {
+        const from = page * pageSize
+        const to = from + pageSize - 1
+        
+        const { data: batch, error: productsError } = await supabase
+          .from('products')
+          .select('id, sku, name, supplier_sku, supplier_id')
+          .range(from, to)
+
+        if (productsError) {
+          console.error('[supplier-stock-import] Failed to fetch products:', productsError)
+          throw new Error('Failed to fetch products for matching')
+        }
+
+        if (batch && batch.length > 0) {
+          allProducts = allProducts.concat(batch)
+          page++
+          hasMore = batch.length === pageSize // Continue if we got a full page
+        } else {
+          hasMore = false
+        }
       }
 
-      console.log(`[supplier-stock-import] Fetched ${products?.length || 0} products (total in db: ${count || 0}) for matching`)
+      const products = allProducts
+      console.log(`[supplier-stock-import] Fetched ${products.length} products across ${page} pages for matching`)
 
       // Create lookup maps for matching
       const productsBySupplierSku = new Map<string, any>()
