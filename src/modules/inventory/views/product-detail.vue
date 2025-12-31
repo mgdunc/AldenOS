@@ -39,8 +39,6 @@ const history = ref<any[]>([])
 const allOrderLines = ref<any[]>([]) 
 const incomingStock = ref<any[]>([]) 
 const shopifyDomain = ref<string | null>(null)
-const shopifyIntegrations = ref<any[]>([])
-const productIntegrations = ref<any[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const uploadingImage = ref(false)
@@ -127,13 +125,15 @@ const loadData = async () => {
         // 6. Fetch Suppliers
         const suppQuery = loadSuppliers()
 
-        // 7. Fetch Shopify Integrations (All)
-        const shopifyQuery = supabase.from('integrations').select('id, name, settings').eq('provider', 'shopify')
+        // 7. Fetch Shopify Integration (single store)
+        const shopifyQuery = supabase
+            .from('integrations')
+            .select('id, name, settings')
+            .eq('provider', 'shopify')
+            .limit(1)
+            .maybeSingle()
 
-        // 8. Fetch Product Integrations
-        const productIntegrationsQuery = supabase.from('product_integrations').select('*').eq('product_id', id)
-
-        const [prodRes, detailsRes, snapRes, histRes, allocRes, poRes, suppRes, shopifyRes, prodIntRes] = await Promise.all([
+        const [prodRes, detailsRes, snapRes, histRes, allocRes, poRes, suppRes, shopifyRes] = await Promise.all([
             productQuery, 
             detailsQuery,
             snapshotsQuery, 
@@ -141,8 +141,7 @@ const loadData = async () => {
             allocationsQuery, 
             poQuery,
             suppQuery,
-            shopifyQuery,
-            productIntegrationsQuery
+            shopifyQuery
         ])
 
         if (prodRes.error) {
@@ -169,11 +168,10 @@ const loadData = async () => {
             incomingStock.value = poRes.data || []
             suppliers.value = suppRes || []
             
-            shopifyIntegrations.value = shopifyRes.data || []
-            productIntegrations.value = prodIntRes.data || []
-
-            if (shopifyIntegrations.value.length > 0) {
-                shopifyDomain.value = shopifyIntegrations.value[0].settings?.shop_url
+            // Get Shopify domain from single integration
+            const shopifySettings = shopifyRes.data?.settings as { shop_url?: string } | null
+            if (shopifySettings?.shop_url) {
+                shopifyDomain.value = shopifySettings.shop_url
             }
 
             // Calculate Demand from LINES (Outstanding Qty)
@@ -324,16 +322,9 @@ const getShopifyUrl = () => {
     return url
 }
 
-const getIntegrationUrl = (link: any) => {
-    const integration = shopifyIntegrations.value.find(i => i.id === link.integration_id)
-    if (!integration || !integration.settings?.shop_url) return '#'
-    
-    let url = `https://${integration.settings.shop_url}/admin/products/${link.external_product_id}`
-    if (link.external_variant_id) {
-        url += `/variants/${link.external_variant_id}`
-    }
-    return url
-}
+const isLinkedToShopify = computed(() => {
+    return !!product.value?.shopify_product_id
+})
 </script>
 
 <template>
@@ -612,35 +603,60 @@ const getIntegrationUrl = (link: any) => {
             <!-- Right Column: Integrations & Timeline -->
             <div class="col-12 lg:col-4 flex flex-column gap-4">
                 
-                <!-- Integrations Card -->
+                <!-- Shopify Integration Card -->
                 <div class="surface-card p-4 shadow-2 border-round">
                     <div class="flex align-items-center gap-2 mb-4">
-                        <i class="pi pi-link text-primary text-xl"></i>
-                        <span class="text-xl font-bold">Integrations</span>
+                        <i class="pi pi-shopping-bag text-primary text-xl"></i>
+                        <span class="text-xl font-bold">Shopify</span>
                     </div>
-                    <div class="flex flex-column gap-2">
-                        <a v-if="product.shopify_product_id && getShopifyUrl()" :href="getShopifyUrl()" target="_blank" class="flex align-items-center gap-3 p-3 border-1 border-green-200 bg-green-50 border-round no-underline hover:bg-green-100 transition-colors transition-duration-200">
-                            <i class="pi pi-shopping-bag text-green-600 text-2xl"></i>
-                            <div class="flex-1">
-                                <div class="font-bold text-green-900">Shopify</div>
-                                <div class="text-xs text-green-700 font-mono">ID: {{ product.shopify_variant_id || product.shopify_product_id }}</div>
-                            </div>
-                            <i class="pi pi-external-link text-green-600"></i>
-                        </a>
-
-                        <a v-for="link in productIntegrations" :key="link.id" :href="getIntegrationUrl(link)" target="_blank" class="flex align-items-center gap-3 p-3 border-1 border-green-200 bg-green-50 border-round no-underline hover:bg-green-100 transition-colors transition-duration-200">
-                            <i class="pi pi-shopping-bag text-green-600 text-2xl"></i>
-                            <div class="flex-1">
-                                <div class="font-bold text-green-900">{{ shopifyIntegrations.find(i => i.id === link.integration_id)?.name || 'Shopify' }}</div>
-                                <div class="text-xs text-green-700">Linked</div>
-                            </div>
-                            <i class="pi pi-external-link text-green-600"></i>
-                        </a>
-
-                        <div v-if="!product.shopify_product_id && productIntegrations.length === 0" class="p-4 border-1 border-dashed surface-border border-round text-center">
-                            <i class="pi pi-link-off text-400 text-3xl mb-2"></i>
-                            <div class="text-500 text-sm">No integrations linked</div>
+                    
+                    <!-- Linked State -->
+                    <div v-if="isLinkedToShopify" class="flex flex-column gap-3">
+                        <div class="flex align-items-center gap-2">
+                            <Tag value="LINKED" severity="success" icon="pi pi-check-circle" />
+                            <span class="text-500 text-sm">Synced from Shopify</span>
                         </div>
+                        
+                        <div class="surface-ground border-round p-3">
+                            <div class="grid">
+                                <div class="col-12 mb-2" v-if="product.shopify_product_id">
+                                    <div class="text-500 text-xs font-medium mb-1">Product ID</div>
+                                    <div class="text-900 font-mono text-sm">{{ product.shopify_product_id }}</div>
+                                </div>
+                                <div class="col-12" v-if="product.shopify_variant_id">
+                                    <div class="text-500 text-xs font-medium mb-1">Variant ID</div>
+                                    <div class="text-900 font-mono text-sm">{{ product.shopify_variant_id }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <a 
+                            v-if="getShopifyUrl()" 
+                            :href="getShopifyUrl()" 
+                            target="_blank" 
+                            class="flex align-items-center justify-content-center gap-2 p-3 bg-green-500 hover:bg-green-600 border-round no-underline text-white font-medium transition-colors transition-duration-200"
+                        >
+                            <i class="pi pi-external-link"></i>
+                            <span>View in Shopify Admin</span>
+                        </a>
+                        <div v-else class="text-500 text-sm text-center p-2">
+                            <i class="pi pi-info-circle mr-1"></i>
+                            Configure Shopify settings to view product
+                        </div>
+                    </div>
+                    
+                    <!-- Not Linked State -->
+                    <div v-else class="flex flex-column align-items-center gap-3 py-4">
+                        <div class="flex align-items-center justify-content-center bg-gray-100 border-round-xl" style="width: 4rem; height: 4rem;">
+                            <i class="pi pi-link-off text-400 text-3xl"></i>
+                        </div>
+                        <div class="text-center">
+                            <div class="font-medium text-700 mb-1">Not linked to Shopify</div>
+                            <div class="text-500 text-sm">This product was created manually or hasn't been synced yet.</div>
+                        </div>
+                        <router-link to="/settings/shopify" class="no-underline">
+                            <Button label="Go to Shopify Settings" icon="pi pi-cog" severity="secondary" outlined size="small" />
+                        </router-link>
                     </div>
                 </div>
 
