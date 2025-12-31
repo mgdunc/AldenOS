@@ -92,7 +92,7 @@ const fetchProducts = async () => {
         .select('*', { count: 'exact' })
         
     if (localSearch.value) {
-        query = query.or(`name.ilike.%${localSearch.value}%,sku.ilike.%${localSearch.value}%`)
+        query = query.or(`name.ilike.%${localSearch.value}%,sku.ilike.%${localSearch.value}%,supplier_sku.ilike.%${localSearch.value}%,barcode.ilike.%${localSearch.value}%`)
     }
 
     if (localStatus.value) {
