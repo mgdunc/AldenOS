@@ -17,13 +17,16 @@ export function useSalesOrders() {
 
     try {
       // First try a simple query to see if basic access works
+      console.log('[loadOrders] Starting count query...')
       const { count, error: countError } = await supabase
         .from('sales_orders')
         .select('*', { count: 'exact', head: true })
       
       if (countError) {
+        console.error('[loadOrders] Count query error:', countError)
         logger.error('Count query error:', countError)
       } else {
+        console.log(`[loadOrders] Total orders in database: ${count}`)
         logger.debug(`Total orders in database: ${count}`)
       }
 
@@ -76,12 +79,15 @@ export function useSalesOrders() {
         query = query.lte('created_at', filters.date_to)
       }
 
+      console.log('[loadOrders] Executing main query with relationships...')
       const { data, error } = await query
 
       if (error) {
+        console.error('[loadOrders] Error loading orders with relationships:', error)
         logger.error('Error loading orders with relationships:', error)
         
         // Fallback: Try without relationships in case there's a FK issue
+        console.log('[loadOrders] Attempting fallback query without relationships')
         logger.debug('Attempting fallback query without relationships')
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('sales_orders')
@@ -89,10 +95,12 @@ export function useSalesOrders() {
           .order('created_at', { ascending: false })
         
         if (fallbackError) {
+          console.error('[loadOrders] Fallback query also failed:', fallbackError)
           logger.error('Fallback query also failed:', fallbackError)
           throw error // Throw original error
         }
         
+        console.log(`[loadOrders] Fallback query loaded ${fallbackData?.length || 0} orders`)
         logger.debug(`Fallback query loaded ${fallbackData?.length || 0} orders`)
         const orders = (fallbackData || []) as SalesOrder[]
         store.setOrders(orders)
@@ -100,9 +108,11 @@ export function useSalesOrders() {
       }
 
       const orders = (data || []) as SalesOrder[]
+      console.log(`[loadOrders] Loaded ${orders.length} orders with relationships`)
       logger.debug(`Loaded ${orders.length} orders with relationships`)
       
       if (orders.length === 0 && count && count > 0) {
+        console.warn(`[loadOrders] Query returned 0 orders but database has ${count} orders. Possible relationship issue.`)
         logger.warn(`Query returned 0 orders but database has ${count} orders. Possible relationship issue.`)
         toast.add({
           severity: 'warn',
