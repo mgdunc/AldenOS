@@ -127,7 +127,7 @@ const parseFileHeaders = async (file: File) => {
     if (rows.length > 0) {
       // Extract headers
       fileHeaders.value = Object.keys(rows[0])
-      
+      console.debug('[SupplierStockUpload] Parsed headers:', fileHeaders.value)
       // Store preview data (first 5 rows)
       previewData.value = rows.slice(0, 5)
 
@@ -135,12 +135,31 @@ const parseFileHeaders = async (file: File) => {
       skuColumn.value = autoDetectColumn(fileHeaders.value, SKU_PATTERNS)
       qtyColumn.value = autoDetectColumn(fileHeaders.value, QTY_PATTERNS)
       nameColumn.value = autoDetectColumn(fileHeaders.value, NAME_PATTERNS)
+    } else {
+      fileHeaders.value = []
+      previewData.value = []
+      showNoColumnsError()
+    }
+    if (fileHeaders.value.length === 0) {
+      showNoColumnsError()
     }
   } catch (e) {
     console.error('Error parsing file:', e)
+    showNoColumnsError()
   } finally {
     parsing.value = false
   }
+// User-facing error for missing columns
+import { useToast } from 'primevue/usetoast'
+const toast = useToast()
+function showNoColumnsError() {
+  toast.add({
+    severity: 'error',
+    summary: 'No Columns Detected',
+    detail: 'No columns were detected in the uploaded file. Please ensure the first row contains column headers and the file is a valid CSV or Excel format.',
+    life: 7000
+  })
+}
 }
 
 const canProceedToMapping = computed(() => {
