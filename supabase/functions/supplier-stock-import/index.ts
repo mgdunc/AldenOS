@@ -221,32 +221,11 @@ serve(async (req) => {
       }
 
       // Insert matched stock levels (upsert to handle duplicates)
-      // If a stock level already exists for the same product_id, supplier_id, and stock_date,
-      // it will be UPDATED with the new quantity value instead of creating a duplicate
+      // Database constraint ensures only one record per product/supplier/date
+      // Using NULLS NOT DISTINCT allows proper upsert with onConflict
       if (matched.length > 0) {
         console.log(`[supplier-stock-import] Upserting ${matched.length} stock levels for date ${stockDate}`)
         
-        // First, delete all existing records for this date/supplier combination in one query
-        const productIds = matched.map(m => m.productId)
-        let deleteQuery = supabase
-          .from('supplier_stock_levels')
-          .delete()
-          .in('product_id', productIds)
-          .eq('stock_date', stockDate)
-        
-        if (supplierId) {
-          deleteQuery = deleteQuery.eq('supplier_id', supplierId)
-        } else {
-          deleteQuery = deleteQuery.is('supplier_id', null)
-        }
-        
-        const { error: deleteError } = await deleteQuery
-        if (deleteError) {
-          console.error('[supplier-stock-import] Failed to delete existing stock levels:', deleteError)
-          // Don't throw - try to insert anyway
-        }
-        
-        // Now insert the new records
         const stockLevels = matched.map(m => ({
           product_id: m.productId,
           supplier_id: supplierId || null,
@@ -257,14 +236,17 @@ serve(async (req) => {
 
         const { error: stockError } = await supabase
           .from('supplier_stock_levels')
-          .insert(stockLevels)
+          .upsert(stockLevels, {
+            onConflict: 'product_id,supplier_id,stock_date',
+            ignoreDuplicates: false
+          })
 
         if (stockError) {
-          console.error('[supplier-stock-import] Failed to insert stock levels:', stockError)
+          console.error('[supplier-stock-import] Failed to upsert stock levels:', stockError)
           throw new Error('Failed to save stock levels')
         }
         
-        console.log(`[supplier-stock-import] Successfully updated stock levels for ${stockDate}`)
+        console.log(`[supplier-stock-import] Successfully upserted ${matched.length} stock levels`)
       }
 
       // Insert unmatched for review
