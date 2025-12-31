@@ -92,7 +92,12 @@ const calculateProgress = (lines: any[]) => {
 }
 
 const fetchOrders = async () => {
-    await loadOrders()
+    console.log('[SalesOrders] Fetching orders...')
+    const orders = await loadOrders()
+    console.log('[SalesOrders] Received orders:', orders?.length || 0)
+    console.log('[SalesOrders] Store orders:', store.orders.length)
+    console.log('[SalesOrders] Filtered orders:', filteredOrders.value.length)
+    console.log('[SalesOrders] Orders with details:', ordersWithDetails.value.length)
 }
 
 const createDraftOrder = async () => {
@@ -179,6 +184,17 @@ onMounted(fetchOrders)
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Debug Info (temporary) -->
+        <div v-if="true" class="p-3 surface-100 border-round text-sm">
+            <strong>Debug Info:</strong><br>
+            Store Orders: {{ store.orders.length }}<br>
+            Filtered Orders: {{ filteredOrders.length }}<br>
+            Orders with Details: {{ ordersWithDetails.length }}<br>
+            Loading: {{ loading }}<br>
+            Active Tab: {{ activeTab }}<br>
+            Search Term: "{{ searchTerm }}"
         </div>
 
         <div class="card shadow-2 p-0 border-round overflow-hidden surface-card">
