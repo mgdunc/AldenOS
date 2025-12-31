@@ -536,6 +536,19 @@ const exportProductsCsv = async () => {
                     </template>
                 </Column>
 
+                <Column field="supplier_available" header="Supplier Stock" sortable style="width: 10rem">
+                    <template #body="{ data }">
+                        <div class="flex flex-column gap-1">
+                            <span :class="data.supplier_available > 0 ? 'font-semibold text-900' : 'text-400'">
+                                {{ data.supplier_available || 0 }}
+                            </span>
+                            <span v-if="data.supplier_stock_date" class="text-xs text-500">
+                                {{ new Date(data.supplier_stock_date).toLocaleDateString() }}
+                            </span>
+                        </div>
+                    </template>
+                </Column>
+
                 <Column field="net_required" header="Net Required" sortable style="width: 10rem">
                     <template #body="{ data }">
                         <div class="flex align-items-center gap-2">
