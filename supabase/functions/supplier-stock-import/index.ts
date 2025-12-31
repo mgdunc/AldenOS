@@ -226,6 +226,20 @@ serve(async (req) => {
       if (matched.length > 0) {
         console.log(`[supplier-stock-import] Upserting ${matched.length} stock levels for date ${stockDate}`)
         
+        // First, delete existing records for this product/date/supplier combination
+        // This is necessary because our unique constraint uses COALESCE and can't be used with onConflict
+        for (const m of matched) {
+          const deleteCondition = supplierId 
+            ? { product_id: m.productId, supplier_id: supplierId, stock_date: stockDate }
+            : { product_id: m.productId, supplier_id: null, stock_date: stockDate }
+          
+          await supabase
+            .from('supplier_stock_levels')
+            .delete()
+            .match(deleteCondition)
+        }
+        
+        // Now insert the new records
         const stockLevels = matched.map(m => ({
           product_id: m.productId,
           supplier_id: supplierId || null,
@@ -236,17 +250,14 @@ serve(async (req) => {
 
         const { error: stockError } = await supabase
           .from('supplier_stock_levels')
-          .upsert(stockLevels, {
-            onConflict: 'product_id,supplier_id,stock_date',
-            ignoreDuplicates: false // Update existing records with new quantity
-          })
+          .insert(stockLevels)
 
         if (stockError) {
-          console.error('[supplier-stock-import] Failed to upsert stock levels:', stockError)
+          console.error('[supplier-stock-import] Failed to insert stock levels:', stockError)
           throw new Error('Failed to save stock levels')
         }
         
-        console.log(`[supplier-stock-import] Successfully upserted stock levels (existing records updated if same date)`)
+        console.log(`[supplier-stock-import] Successfully updated stock levels for ${stockDate}`)
       }
 
       // Insert unmatched for review
