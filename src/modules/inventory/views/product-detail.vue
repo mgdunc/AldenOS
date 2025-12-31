@@ -89,7 +89,7 @@ const loadData = async () => {
         // 1b. Fetch Details from Table (Shopify IDs, etc not in view)
         const detailsQuery = supabase
             .from('products')
-            .select('shopify_product_id, shopify_variant_id, supplier_id, carton_barcode, image_url')
+            .select('shopify_product_id, shopify_variant_id, supplier_id, supplier_sku, carton_barcode, image_url')
             .eq('id', id)
             .single()
 
@@ -193,6 +193,7 @@ const loadData = async () => {
 const updateProduct = async () => {
     const success = await updateProductComposable(id, {
         supplier_id: product.value.supplier_id,
+        supplier_sku: product.value.supplier_sku,
         barcode: product.value.barcode,
         description: product.value.description,
         list_price: product.value.list_price,
@@ -495,6 +496,10 @@ const isLinkedToShopify = computed(() => {
                             <div class="text-900">{{ suppliers.find(s => s.id === product.supplier_id)?.name || '-' }}</div>
                         </div>
                         <div class="col-6 md:col-4 mb-3">
+                            <div class="text-500 text-sm font-medium mb-1">Supplier SKU</div>
+                            <div class="text-900 font-mono">{{ product.supplier_sku || '-' }}</div>
+                        </div>
+                        <div class="col-6 md:col-4 mb-3">
                             <div class="text-500 text-sm font-medium mb-1">Vendor / Brand</div>
                             <div class="text-900">{{ product.vendor || '-' }}</div>
                         </div>
@@ -553,6 +558,10 @@ const isLinkedToShopify = computed(() => {
                         <div class="field col-12 md:col-6">
                             <label class="font-medium text-sm text-700 mb-2 block">Supplier</label>
                             <Select v-model="product.supplier_id" :options="suppliers" optionLabel="name" optionValue="id" placeholder="Select Supplier" filter showClear class="w-full" />
+                        </div>
+                        <div class="field col-12 md:col-6">
+                            <label class="font-medium text-sm text-700 mb-2 block">Supplier SKU</label>
+                            <InputText v-model="product.supplier_sku" class="w-full font-mono" placeholder="Supplier's part number" />
                         </div>
                         <div class="field col-6 md:col-3">
                             <label class="font-medium text-sm text-700 mb-2 block">Vendor / Brand</label>
