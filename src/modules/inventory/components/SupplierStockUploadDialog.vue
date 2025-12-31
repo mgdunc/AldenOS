@@ -159,6 +159,8 @@ function showNoColumnsError() {
     detail: 'No columns were detected in the uploaded file. Please ensure the first row contains column headers and the file is a valid CSV or Excel format.',
     life: 7000
   })
+  // Do NOT close the dialog on error
+  // dialogVisible.value = true
 }
 }
 
