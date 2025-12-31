@@ -34,6 +34,7 @@ export async function getShopifyConfigFromDb(): Promise<ShopifyEnvConfig | null>
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   
   if (!supabaseUrl || !supabaseKey) {
+    console.log('[ShopifyConfig] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
     return null
   }
 
@@ -43,11 +44,23 @@ export async function getShopifyConfigFromDb(): Promise<ShopifyEnvConfig | null>
     .from('integrations')
     .select('settings')
     .eq('provider', 'shopify')
-    .eq('enabled', true)
     .limit(1)
     .maybeSingle()
 
-  if (error || !data?.settings?.shop_url || !data?.settings?.access_token) {
+  if (error) {
+    console.error('[ShopifyConfig] Database error:', error)
+    return null
+  }
+
+  if (!data) {
+    console.log('[ShopifyConfig] No Shopify integration found in database')
+    return null
+  }
+
+  console.log('[ShopifyConfig] Found integration, has shop_url:', !!data.settings?.shop_url, 'has token:', !!data.settings?.access_token)
+
+  if (!data.settings?.shop_url || !data.settings?.access_token) {
+    console.log('[ShopifyConfig] Integration missing shop_url or access_token in settings')
     return null
   }
 
