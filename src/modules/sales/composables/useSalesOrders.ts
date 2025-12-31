@@ -55,8 +55,23 @@ export function useSalesOrders() {
       
       if (testError) {
         console.error('[loadOrders] Simple SELECT error:', testError)
+        console.error('[loadOrders] Error details:', JSON.stringify(testError, null, 2))
       } else {
         console.log(`[loadOrders] Simple SELECT returned ${testData?.length || 0} rows:`, testData)
+      }
+
+      // Log the Supabase URL to verify we're connected to the right project
+      const supabaseUrl = (supabase as any).supabaseUrl || 'unknown'
+      console.log('[loadOrders] Supabase URL:', supabaseUrl)
+      console.log('[loadOrders] Expected project: zpdajajlqbeorbylhmlz')
+      if (!supabaseUrl.includes('zpdajajlqbeorbylhmlz')) {
+        console.warn('[loadOrders] WARNING: Connected to different Supabase project!')
+        toast.add({
+          severity: 'warn',
+          summary: 'Wrong Project',
+          detail: `Connected to ${supabaseUrl} but expected zpdajajlqbeorbylhmlz`,
+          life: 10000
+        })
       }
 
       let query = supabase
