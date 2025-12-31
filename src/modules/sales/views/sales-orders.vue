@@ -79,7 +79,9 @@ const ordersWithDetails = computed(() => {
         // Display customer name from relationship or fallback to direct field
         display_customer_name: order.customer?.name || order.customer_name || 'No Customer',
         item_count: order.lines?.length || 0,
-        fulfillment_pct: calculateProgress(order.lines || [])
+        fulfillment_pct: calculateProgress(order.lines || []),
+        // Ensure order_date is set for sorting (fallback to created_at)
+        order_date: order.order_date || order.created_at
     }))
 })
 
@@ -216,6 +218,8 @@ onMounted(fetchOrders)
                 :scrollable="!isMobile"
                 responsiveLayout="scroll"
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                sortField="order_date"
+                :sortOrder="-1"
             >
                 <template #empty>
                     <div class="p-4 text-center">
