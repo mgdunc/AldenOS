@@ -217,7 +217,40 @@ onMounted(fetchOrders)
                 responsiveLayout="scroll"
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
             >
-                <template #empty><div class="p-4 text-center">No sales orders found for this filter.</div></template>
+                <template #empty>
+                    <div class="p-4 text-center">
+                        <div v-if="loading" class="flex flex-column align-items-center gap-2">
+                            <i class="pi pi-spin pi-spinner text-3xl text-500"></i>
+                            <span class="text-500">Loading orders...</span>
+                        </div>
+                        <div v-else class="flex flex-column align-items-center gap-3">
+                            <i class="pi pi-inbox text-4xl text-300"></i>
+                            <div>
+                                <p class="text-600 font-medium mb-2">No sales orders found</p>
+                                <p class="text-500 text-sm mb-3">
+                                    <span v-if="activeTab !== 'all'">No orders match the "{{ activeTab }}" filter.</span>
+                                    <span v-else>You haven't created any sales orders yet.</span>
+                                </p>
+                                <p class="text-500 text-sm" v-if="store.orders.length === 0 && !loading">
+                                    Total orders in database: {{ store.orders.length }}
+                                </p>
+                            </div>
+                            <Button 
+                                label="Create New Order" 
+                                icon="pi pi-plus" 
+                                @click="createDraftOrder"
+                                :loading="saving"
+                            />
+                            <Button 
+                                v-if="activeTab !== 'all'"
+                                label="View All Orders" 
+                                icon="pi pi-list" 
+                                outlined
+                                @click="activeTab = 'all'"
+                            />
+                        </div>
+                    </div>
+                </template>
 
                 <Column expander style="width: 3rem" />
 
