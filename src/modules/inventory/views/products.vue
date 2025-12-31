@@ -298,6 +298,15 @@ const exportProductsCsv = async () => {
                 <h1 class="text-xl font-bold m-0 text-900">Products</h1>
             </div>
             <div class="flex gap-2">
+                <router-link to="/inventory/import-export" class="no-underline">
+                    <Button 
+                        label="Bulk Import" 
+                        icon="pi pi-upload" 
+                        size="small" 
+                        severity="secondary" 
+                        outlined
+                    />
+                </router-link>
                 <Button 
                     label="Export CSV" 
                     icon="pi pi-download" 
@@ -333,7 +342,7 @@ const exportProductsCsv = async () => {
                         <div class="flex-1">
                             <span class="block text-500 font-medium mb-1 text-xs uppercase">Low Stock</span>
                             <div class="text-900 font-bold text-2xl mb-1">{{ statsRpc.low_stock }}</div>
-                            <span class="text-600 text-xs">Below reorder point</span>
+                            <span class="text-600 text-xs">Available ≤ 10</span>
                         </div>
                         <div class="flex align-items-center justify-content-center bg-orange-50 border-round" style="width: 2.5rem; height: 2.5rem;">
                             <i class="pi pi-exclamation-triangle text-orange-500"></i>

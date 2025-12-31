@@ -27,14 +27,20 @@ const INVENTORY_FIELDS: ImportField[] = [
 ]
 
 const PRODUCT_FIELDS: ImportField[] = [
-    { key: 'sku', label: 'SKU', required: true, aliases: ['sku', 'part number'] },
-    { key: 'name', label: 'Name', required: true, aliases: ['name', 'title', 'description'] },
-    { key: 'cost_price', label: 'Cost Price', required: false, aliases: ['cost', 'buy price'] },
-    { key: 'list_price', label: 'List Price', required: false, aliases: ['price', 'sell price', 'rrp'] },
-    { key: 'barcode', label: 'Barcode', required: false, aliases: ['barcode', 'upc', 'ean'] },
-    { key: 'carton_barcode', label: 'Carton Barcode', required: false, aliases: ['carton barcode', 'itf'] },
-    { key: 'carton_qty', label: 'Carton Qty', required: false, aliases: ['carton qty', 'pack size', 'inner'] },
-    { key: 'supplier', label: 'Supplier Name', required: false, aliases: ['supplier', 'vendor'] }
+    { key: 'sku', label: 'SKU', required: true, aliases: ['sku', 'part number', 'item number', 'product code'] },
+    { key: 'name', label: 'Name', required: true, aliases: ['name', 'title', 'product name', 'product title'] },
+    { key: 'description', label: 'Description', required: false, aliases: ['description', 'desc', 'details'] },
+    { key: 'cost_price', label: 'Cost Price', required: false, aliases: ['cost', 'cost price', 'buy price', 'unit cost'] },
+    { key: 'list_price', label: 'List Price', required: false, aliases: ['price', 'list price', 'sell price', 'rrp', 'retail price'] },
+    { key: 'compare_at_price', label: 'Compare At Price', required: false, aliases: ['compare at', 'compare price', 'was price', 'original price'] },
+    { key: 'barcode', label: 'Barcode (UPC/EAN)', required: false, aliases: ['barcode', 'upc', 'ean', 'gtin'] },
+    { key: 'carton_barcode', label: 'Carton Barcode', required: false, aliases: ['carton barcode', 'case barcode', 'itf', 'outer barcode'] },
+    { key: 'carton_qty', label: 'Carton Qty', required: false, aliases: ['carton qty', 'pack size', 'inner qty', 'case qty', 'units per case'] },
+    { key: 'supplier_sku', label: 'Supplier SKU', required: false, aliases: ['supplier sku', 'vendor sku', 'supplier code', 'vendor code', 'manufacturer part'] },
+    { key: 'vendor', label: 'Brand / Vendor', required: false, aliases: ['vendor', 'brand', 'manufacturer'] },
+    { key: 'product_type', label: 'Product Type', required: false, aliases: ['product type', 'category', 'type'] },
+    { key: 'supplier', label: 'Supplier Name', required: false, aliases: ['supplier', 'supplier name'] },
+    { key: 'status', label: 'Status', required: false, aliases: ['status', 'active', 'enabled'] }
 ]
 
 const LOCATION_FIELDS: ImportField[] = [
@@ -55,12 +61,18 @@ const InventoryImportSchema = z.object({
 const ProductImportSchema = z.object({
     sku: z.string().min(1, "SKU is required"),
     name: z.string().min(1, "Name is required"),
+    description: z.string().optional(),
     cost_price: z.number().optional(),
     list_price: z.number().optional(),
+    compare_at_price: z.number().optional(),
     barcode: z.string().optional(),
     carton_barcode: z.string().optional(),
     carton_qty: z.number().int().optional(),
-    supplier: z.string().optional()
+    supplier_sku: z.string().optional(),
+    vendor: z.string().optional(),
+    product_type: z.string().optional(),
+    supplier: z.string().optional(),
+    status: z.string().optional()
 })
 
 const LocationImportSchema = z.object({
@@ -193,7 +205,7 @@ export function useImportMapper(mode: 'inventory' | 'products' | 'locations' = '
                     let val = row[fileHeader]
                     
                     // Type coercion
-                    if (['quantity', 'cost_price', 'list_price', 'carton_qty'].includes(systemKey)) {
+                    if (['quantity', 'cost_price', 'list_price', 'compare_at_price', 'carton_qty'].includes(systemKey)) {
                         if (val === null || val === undefined || val === '') {
                             val = undefined
                         } else if (typeof val === 'string') {
