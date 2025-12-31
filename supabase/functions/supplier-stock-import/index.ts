@@ -118,11 +118,13 @@ serve(async (req) => {
       let productsWithSupplierSku = 0
       for (const product of products || []) {
         if (product.supplier_sku) {
-          productsBySupplierSku.set(product.supplier_sku.toLowerCase().trim(), product)
+          const normalizedSupplierSku = String(product.supplier_sku).toLowerCase().replace(/\s+/g, '').replace(/^0+/, '')
+          productsBySupplierSku.set(normalizedSupplierSku, product)
           productsWithSupplierSku++
         }
         if (product.sku) {
-          productsBySku.set(product.sku.toLowerCase().trim(), product)
+          const normalizedSku = String(product.sku).toLowerCase().replace(/\s+/g, '').replace(/^0+/, '')
+          productsBySku.set(normalizedSku, product)
         }
       }
 
@@ -155,8 +157,8 @@ serve(async (req) => {
         const sku = String(skuValue).trim()
         const quantity = parseInt(String(qtyValue || 0).replace(/[^0-9-]/g, '')) || 0
 
-        // Try to match by supplier_sku first, then by regular sku
-        const normalizedSku = sku.toLowerCase()
+        // More robust normalization: lowercase, remove all whitespace, strip leading zeros
+        const normalizedSku = sku.toLowerCase().replace(/\s+/g, '').replace(/^0+/, '')
         const matchedBySupplierSku = productsBySupplierSku.get(normalizedSku)
         const matchedBySku = productsBySku.get(normalizedSku)
         let product = matchedBySupplierSku || matchedBySku
