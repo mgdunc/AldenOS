@@ -221,7 +221,11 @@ serve(async (req) => {
       }
 
       // Insert matched stock levels (upsert to handle duplicates)
+      // If a stock level already exists for the same product_id, supplier_id, and stock_date,
+      // it will be UPDATED with the new quantity value instead of creating a duplicate
       if (matched.length > 0) {
+        console.log(`[supplier-stock-import] Upserting ${matched.length} stock levels for date ${stockDate}`)
+        
         const stockLevels = matched.map(m => ({
           product_id: m.productId,
           supplier_id: supplierId || null,
@@ -234,13 +238,15 @@ serve(async (req) => {
           .from('supplier_stock_levels')
           .upsert(stockLevels, {
             onConflict: 'product_id,supplier_id,stock_date',
-            ignoreDuplicates: false
+            ignoreDuplicates: false // Update existing records with new quantity
           })
 
         if (stockError) {
-          console.error('[supplier-stock-import] Failed to insert stock levels:', stockError)
+          console.error('[supplier-stock-import] Failed to upsert stock levels:', stockError)
           throw new Error('Failed to save stock levels')
         }
+        
+        console.log(`[supplier-stock-import] Successfully upserted stock levels (existing records updated if same date)`)
       }
 
       // Insert unmatched for review
