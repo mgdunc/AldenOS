@@ -82,7 +82,7 @@ const fetchTableProducts = async () => {
         .from('product_inventory_view')
         .select(`
             id, sku, name, list_price, price_cost,
-            available, net_required, on_order
+            available, net_required, on_order, supplier_available
         `)
         .limit(100)
 
@@ -228,6 +228,13 @@ watch(() => props.visible, (newVal) => {
                 <Column field="on_order" header="Incoming" sortable style="width: 8rem" class="text-center">
                     <template #body="{ data }">
                         <span v-if="data.on_order > 0" class="text-blue-600 font-bold">{{ data.on_order }}</span>
+                        <span v-else class="text-300">-</span>
+                    </template>
+                </Column>
+
+                <Column field="supplier_available" header="Supplier" sortable style="width: 8rem" class="text-center">
+                    <template #body="{ data }">
+                        <span v-if="data.supplier_available > 0" class="text-teal-600 font-bold">{{ data.supplier_available }}</span>
                         <span v-else class="text-300">-</span>
                     </template>
                 </Column>

@@ -20,6 +20,11 @@ export const routes = [
     component: () => import('./views/ImportExportView.vue')
   },
   {
+    path: '/inventory/supplier-stock',
+    name: 'supplier-stock',
+    component: () => import('./views/supplier-stock.vue')
+  },
+  {
     path: '/inventory/locations/:id',
     name: 'location-detail',
     component: () => import('./views/LocationDetailView.vue')

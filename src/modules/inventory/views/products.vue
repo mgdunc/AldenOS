@@ -210,6 +210,82 @@ const getStatusSeverity = (status: string) => {
         default: return 'info';
     }
 }
+
+// CSV Export
+const exportingCsv = ref(false)
+
+const exportProductsCsv = async () => {
+    exportingCsv.value = true
+    try {
+        // Fetch all products with inventory data (including supplier stock)
+        const { data, error } = await supabase
+            .from('product_inventory_view')
+            .select('sku, name, status, available, reserved, qoh, demand, supplier_available, supplier_stock_date, cost_price, retail_price, list_price')
+            .order('sku')
+        
+        if (error) throw error
+        
+        const products = data || []
+        
+        // Build CSV
+        const headers = [
+            'SKU',
+            'Product Name',
+            'Status',
+            'Available',
+            'Reserved',
+            'On Hand',
+            'Demand',
+            'Supplier Available',
+            'Supplier Stock Date',
+            'Cost Price',
+            'Retail Price',
+            'List Price'
+        ]
+        
+        const rows = products.map(p => [
+            p.sku || '',
+            p.name || '',
+            p.status || '',
+            p.available ?? 0,
+            p.reserved ?? 0,
+            p.qoh ?? 0,
+            p.demand ?? 0,
+            p.supplier_available ?? 0,
+            p.supplier_stock_date || '',
+            p.cost_price ?? '',
+            p.retail_price ?? '',
+            p.list_price ?? ''
+        ])
+        
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => {
+                const str = String(cell)
+                // Escape quotes and wrap in quotes if contains comma or newline
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`
+                }
+                return str
+            }).join(','))
+        ].join('\n')
+        
+        // Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `products-export-${new Date().toISOString().split('T')[0]}.csv`
+        link.click()
+        URL.revokeObjectURL(url)
+        
+    } catch (e) {
+        logger.error('Failed to export products CSV', e as Error)
+        handleError(e)
+    } finally {
+        exportingCsv.value = false
+    }
+}
 </script>
 
 <template>
@@ -221,7 +297,18 @@ const getStatusSeverity = (status: string) => {
                 <i class="pi pi-box text-primary text-xl"></i>
                 <h1 class="text-xl font-bold m-0 text-900">Products</h1>
             </div>
-            <Button label="New Product" icon="pi pi-plus" size="small" @click="showCreateDialog = true" />
+            <div class="flex gap-2">
+                <Button 
+                    label="Export CSV" 
+                    icon="pi pi-download" 
+                    size="small" 
+                    severity="secondary" 
+                    outlined
+                    @click="exportProductsCsv" 
+                    :loading="exportingCsv"
+                />
+                <Button label="New Product" icon="pi pi-plus" size="small" @click="showCreateDialog = true" />
+            </div>
         </div>
 
         <!-- Stats Cards -->

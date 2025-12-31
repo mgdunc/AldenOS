@@ -74,6 +74,7 @@ const items = ref([
         items: [
             { label: 'Products', icon: 'pi pi-box', route: '/products' },
             { label: 'Locations', icon: 'pi pi-map-marker', route: '/inventory/locations' },
+            { label: 'Supplier Stock', icon: 'pi pi-truck', route: '/inventory/supplier-stock' },
             { label: 'Stock Ledger', icon: 'pi pi-book', route: '/dev/ledger' },
             { label: 'Import / Export', icon: 'pi pi-file-excel', route: '/inventory/import-export' },
         ]

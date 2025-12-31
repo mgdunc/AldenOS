@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'primevue/usetoast'
 import { useInventory } from '../composables/useInventory'
+import { useSupplierStock } from '../composables/useSupplierStock'
 import { logger } from '@/lib/logger'
 
 // Custom Components
@@ -23,6 +24,7 @@ import Card from 'primevue/card'
 import Divider from 'primevue/divider'
 import Textarea from 'primevue/textarea'
 import InputNumber from 'primevue/inputnumber'
+import Chart from 'primevue/chart'
 
 import TimelineSidebar from '@/modules/core/components/TimelineSidebar.vue'
 import { getStatusSeverity } from '@/lib/statusHelpers'
@@ -31,6 +33,7 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const { loadSuppliers, updateProduct: updateProductComposable } = useInventory()
+const { getProductSupplierStock, getProductSupplierStockHistory } = useSupplierStock()
 const id = route.params.id as string
 
 const product = ref<any>(null)
@@ -46,7 +49,13 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const editMode = ref(false)
 
 const totalOnOrder = ref(0)
-const totalRequired = ref(0) 
+const totalRequired = ref(0)
+
+// Supplier Stock
+const supplierStock = ref<{ quantity: number; stock_date: string; supplier_name: string } | null>(null)
+const showSupplierStockDialog = ref(false)
+const supplierStockHistory = ref<Array<{ stock_date: string; quantity: number }>>([])
+const loadingSupplierHistory = ref(false) 
 
 // Dialog States
 const showAdjustDialog = ref(false)
@@ -181,12 +190,70 @@ const loadData = async () => {
             }, 0)
             
             totalOnOrder.value = incomingStock.value.reduce((sum, line) => sum + (line.quantity_ordered - (line.quantity_received || 0)), 0)
+            
+            // Load supplier stock (async, don't block)
+            loadSupplierStock()
         }
     } catch (e) {
         logger.error('Failed to load product data', e as Error)
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load product data' })
     } finally {
         loading.value = false
+    }
+}
+
+const loadSupplierStock = async () => {
+    const stock = await getProductSupplierStock(id)
+    supplierStock.value = stock
+}
+
+const openSupplierStockHistory = async () => {
+    showSupplierStockDialog.value = true
+    loadingSupplierHistory.value = true
+    
+    const historyData = await getProductSupplierStockHistory(id, 90) // 90 days
+    supplierStockHistory.value = historyData
+    loadingSupplierHistory.value = false
+}
+
+const supplierStockChartData = computed(() => {
+    if (!supplierStockHistory.value.length) return null
+    
+    return {
+        labels: supplierStockHistory.value.map(h => {
+            const d = new Date(h.stock_date)
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+        }),
+        datasets: [
+            {
+                label: 'Supplier Stock',
+                data: supplierStockHistory.value.map(h => h.quantity),
+                fill: true,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: '#10b981'
+            }
+        ]
+    }
+})
+
+const supplierStockChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            display: false
+        }
+    },
+    scales: {
+        y: {
+            beginAtZero: true,
+            ticks: {
+                stepSize: 1
+            }
+        }
     }
 }
 
@@ -427,7 +494,7 @@ const isLinkedToShopify = computed(() => {
                 </div>
             </div>
 
-            <div class="col-12 md:col-4 lg:col">
+            <div class="col-6 md:col-4 lg:col">
                 <div class="surface-card shadow-1 p-3 border-round h-full cursor-pointer hover:shadow-3 transition-all transition-duration-200" @click="showRequiredDialog = true">
                     <div class="flex align-items-center gap-3">
                         <div class="flex align-items-center justify-content-center border-round" :class="totalRequired > product.total_available ? 'bg-red-100' : 'bg-gray-100'" style="width: 3rem; height: 3rem;">
@@ -436,6 +503,23 @@ const isLinkedToShopify = computed(() => {
                         <div class="flex-1">
                             <div class="text-500 text-sm font-medium">Required</div>
                             <div class="text-2xl font-bold" :class="totalRequired > product.total_available ? 'text-red-600' : 'text-900'">{{ totalRequired }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 md:col-4 lg:col">
+                <div class="surface-card shadow-1 p-3 border-round h-full cursor-pointer hover:shadow-3 transition-all transition-duration-200" @click="openSupplierStockHistory">
+                    <div class="flex align-items-center gap-3">
+                        <div class="flex align-items-center justify-content-center bg-teal-100 border-round" style="width: 3rem; height: 3rem;">
+                            <i class="pi pi-building text-teal-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-500 text-sm font-medium">Supplier Stock</div>
+                            <div class="text-teal-600 text-2xl font-bold">{{ supplierStock?.quantity ?? '-' }}</div>
+                            <div v-if="supplierStock?.stock_date" class="text-400 text-xs">
+                                as of {{ new Date(supplierStock.stock_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -738,4 +822,70 @@ const isLinkedToShopify = computed(() => {
         :product="product"
         @saved="onAdjustmentSaved"
     />
+
+    <Dialog v-model:visible="showSupplierStockDialog" header="Supplier Stock History" :modal="true" :style="{ width: '700px' }">
+        <div v-if="loadingSupplierHistory" class="flex justify-content-center py-6">
+            <i class="pi pi-spin pi-spinner text-4xl text-500"></i>
+        </div>
+        <div v-else-if="supplierStockHistory.length === 0" class="flex flex-column align-items-center gap-3 py-6">
+            <i class="pi pi-chart-line text-4xl text-300"></i>
+            <div class="text-center">
+                <p class="text-600 font-medium mb-1">No supplier stock history</p>
+                <p class="text-500 text-sm">Upload supplier stock files to track availability over time</p>
+            </div>
+            <router-link to="/inventory/supplier-stock" class="no-underline">
+                <Button label="Go to Supplier Stock" icon="pi pi-upload" severity="secondary" outlined size="small" />
+            </router-link>
+        </div>
+        <div v-else>
+            <!-- Current Stock Summary -->
+            <div class="surface-ground border-round p-3 mb-4">
+                <div class="grid">
+                    <div class="col-6">
+                        <div class="text-500 text-sm">Current Stock</div>
+                        <div class="text-2xl font-bold text-teal-600">{{ supplierStock?.quantity ?? 0 }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-500 text-sm">Last Updated</div>
+                        <div class="text-lg font-medium">
+                            {{ supplierStock?.stock_date ? new Date(supplierStock.stock_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Chart -->
+            <div class="mb-3">
+                <div class="text-sm font-medium text-700 mb-2">Last 90 Days</div>
+                <div style="height: 250px;">
+                    <Chart v-if="supplierStockChartData" type="line" :data="supplierStockChartData" :options="supplierStockChartOptions" />
+                </div>
+            </div>
+            
+            <!-- History Table -->
+            <div>
+                <div class="text-sm font-medium text-700 mb-2">History</div>
+                <DataTable :value="supplierStockHistory" size="small" stripedRows :rows="5" paginator>
+                    <Column field="stock_date" header="Date" sortable>
+                        <template #body="{ data }">
+                            {{ new Date(data.stock_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }}
+                        </template>
+                    </Column>
+                    <Column field="quantity" header="Quantity" sortable>
+                        <template #body="{ data }">
+                            <span class="font-bold">{{ data.quantity }}</span>
+                        </template>
+                    </Column>
+                </DataTable>
+            </div>
+        </div>
+        <template #footer>
+            <div class="flex justify-content-between w-full">
+                <router-link to="/inventory/supplier-stock" class="no-underline">
+                    <Button label="Manage Uploads" icon="pi pi-upload" severity="secondary" text />
+                </router-link>
+                <Button label="Close" icon="pi pi-times" text @click="showSupplierStockDialog = false" />
+            </div>
+        </template>
+    </Dialog>
 </template>
