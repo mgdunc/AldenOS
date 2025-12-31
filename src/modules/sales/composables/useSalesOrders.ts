@@ -16,82 +16,6 @@ export function useSalesOrders() {
     store.loading = true
 
     try {
-      // Check authentication first
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      console.log('[loadOrders] Auth check - User:', user?.id || 'NOT AUTHENTICATED', 'Error:', authError)
-      
-      if (!user) {
-        console.error('[loadOrders] User not authenticated!')
-        toast.add({
-          severity: 'error',
-          summary: 'Authentication Required',
-          detail: 'Please log in to view orders',
-          life: 5000
-        })
-        store.setOrders([])
-        return []
-      }
-
-      // First try a simple query to see if basic access works
-      console.log('[loadOrders] Starting count query...')
-      const { count, error: countError } = await supabase
-        .from('sales_orders')
-        .select('*', { count: 'exact', head: true })
-      
-      if (countError) {
-        console.error('[loadOrders] Count query error:', countError)
-        logger.error('Count query error:', countError)
-      } else {
-        console.log(`[loadOrders] Total orders in database: ${count}`)
-        logger.debug(`Total orders in database: ${count}`)
-      }
-
-      // Also try a simple SELECT to see if we get any rows
-      console.log('[loadOrders] Testing simple SELECT query...')
-      const { data: testData, error: testError } = await supabase
-        .from('sales_orders')
-        .select('id, order_number, status')
-        .limit(5)
-      
-      if (testError) {
-        console.error('[loadOrders] Simple SELECT error:', testError)
-        console.error('[loadOrders] Error details:', JSON.stringify(testError, null, 2))
-      } else {
-        console.log(`[loadOrders] Simple SELECT returned ${testData?.length || 0} rows:`, testData)
-      }
-
-      // Log the Supabase URL to verify we're connected to the right project
-      const supabaseUrl = (supabase as any).supabaseUrl || 'unknown'
-      console.log('[loadOrders] Supabase URL:', supabaseUrl)
-      console.log('[loadOrders] Expected project: zpdajajlqbeorbylhmlz')
-      if (!supabaseUrl.includes('zpdajajlqbeorbylhmlz')) {
-        console.warn('[loadOrders] WARNING: Connected to different Supabase project!')
-        toast.add({
-          severity: 'warn',
-          summary: 'Wrong Project',
-          detail: `Connected to ${supabaseUrl} but expected zpdajajlqbeorbylhmlz`,
-          life: 10000
-        })
-      }
-
-      // Test RPC function that bypasses RLS to verify data exists
-      console.log('[loadOrders] Testing RPC function to bypass RLS...')
-      const { data: rpcData, error: rpcError } = await supabase.rpc('test_sales_orders_count')
-      if (rpcError) {
-        console.error('[loadOrders] RPC test error:', rpcError)
-      } else {
-        console.log('[loadOrders] RPC test result (bypasses RLS):', rpcData)
-        if (rpcData && rpcData.length > 0 && rpcData[0].count > 0) {
-          console.warn(`[loadOrders] RPC found ${rpcData[0].count} orders but direct query returns 0! This confirms RLS is blocking access.`)
-          toast.add({
-            severity: 'error',
-            summary: 'RLS Policy Issue',
-            detail: `Found ${rpcData[0].count} orders via RPC but 0 via direct query. RLS policies need fixing.`,
-            life: 10000
-          })
-        }
-      }
-
       let query = supabase
         .from('sales_orders')
         .select(`
@@ -141,62 +65,20 @@ export function useSalesOrders() {
         query = query.lte('created_at', filters.date_to)
       }
 
-      console.log('[loadOrders] Executing main query with relationships...')
       const { data, error } = await query
 
-      if (error) {
-        console.error('[loadOrders] Error loading orders with relationships:', error)
-        logger.error('Error loading orders with relationships:', error)
-        
-        // Fallback: Try without relationships in case there's a FK issue
-        console.log('[loadOrders] Attempting fallback query without relationships')
-        logger.debug('Attempting fallback query without relationships')
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('sales_orders')
-          .select('*')
-          .order('created_at', { ascending: false })
-        
-        if (fallbackError) {
-          console.error('[loadOrders] Fallback query also failed:', fallbackError)
-          logger.error('Fallback query also failed:', fallbackError)
-          throw error // Throw original error
-        }
-        
-        console.log(`[loadOrders] Fallback query loaded ${fallbackData?.length || 0} orders`)
-        logger.debug(`Fallback query loaded ${fallbackData?.length || 0} orders`)
-        const orders = (fallbackData || []) as SalesOrder[]
-        store.setOrders(orders)
-        return orders
-      }
+      if (error) throw error
 
       const orders = (data || []) as SalesOrder[]
-      console.log(`[loadOrders] Loaded ${orders.length} orders with relationships`)
-      logger.debug(`Loaded ${orders.length} orders with relationships`)
-      
-      if (orders.length === 0 && count && count > 0) {
-        console.warn(`[loadOrders] Query returned 0 orders but database has ${count} orders. Possible relationship issue.`)
-        logger.warn(`Query returned 0 orders but database has ${count} orders. Possible relationship issue.`)
-        toast.add({
-          severity: 'warn',
-          summary: 'No Orders Displayed',
-          detail: `Found ${count} orders in database but query returned none. Check relationships.`,
-          life: 5000
-        })
-      }
-      
       store.setOrders(orders)
       return orders
     } catch (error: any) {
       logger.error('Error loading orders', error)
-      const errorMessage = error?.message || error?.details || error?.hint || 'Failed to load sales orders'
-      console.error('Full error object:', error)
       toast.add({
         severity: 'error',
-        summary: 'Error Loading Orders',
-        detail: errorMessage,
-        life: 5000
+        summary: 'Error',
+        detail: 'Failed to load sales orders'
       })
-      store.setOrders([]) // Clear store on error
       return []
     } finally {
       loading.value = false
