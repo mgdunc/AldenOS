@@ -100,18 +100,18 @@ serve(async (req) => {
       console.log('[supplier-stock-import] First row columns:', Object.keys(rows[0]))
 
       // Get all products with supplier_sku for matching
-      // Use range to fetch all products (Supabase defaults to 1000 row limit)
-      const { data: products, error: productsError } = await supabase
+      // Explicitly set limit to avoid Supabase's default 1000 row limit
+      const { data: products, error: productsError, count } = await supabase
         .from('products')
-        .select('id, sku, name, supplier_sku, supplier_id')
-        .range(0, 9999) // Fetch up to 10,000 products
+        .select('id, sku, name, supplier_sku, supplier_id', { count: 'exact' })
+        .limit(20000) // Set explicit high limit
 
       if (productsError) {
         console.error('[supplier-stock-import] Failed to fetch products:', productsError)
         throw new Error('Failed to fetch products for matching')
       }
 
-      console.log(`[supplier-stock-import] Fetched ${products?.length || 0} products for matching`)
+      console.log(`[supplier-stock-import] Fetched ${products?.length || 0} products (total in db: ${count || 0}) for matching`)
 
       // Create lookup maps for matching
       const productsBySupplierSku = new Map<string, any>()
