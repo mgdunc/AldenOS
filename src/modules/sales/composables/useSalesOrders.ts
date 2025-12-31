@@ -74,6 +74,24 @@ export function useSalesOrders() {
         })
       }
 
+      // Test RPC function that bypasses RLS to verify data exists
+      console.log('[loadOrders] Testing RPC function to bypass RLS...')
+      const { data: rpcData, error: rpcError } = await supabase.rpc('test_sales_orders_count')
+      if (rpcError) {
+        console.error('[loadOrders] RPC test error:', rpcError)
+      } else {
+        console.log('[loadOrders] RPC test result (bypasses RLS):', rpcData)
+        if (rpcData && rpcData.length > 0 && rpcData[0].count > 0) {
+          console.warn(`[loadOrders] RPC found ${rpcData[0].count} orders but direct query returns 0! This confirms RLS is blocking access.`)
+          toast.add({
+            severity: 'error',
+            summary: 'RLS Policy Issue',
+            detail: `Found ${rpcData[0].count} orders via RPC but 0 via direct query. RLS policies need fixing.`,
+            life: 10000
+          })
+        }
+      }
+
       let query = supabase
         .from('sales_orders')
         .select(`
