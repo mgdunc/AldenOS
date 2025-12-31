@@ -67,18 +67,25 @@ export function useSalesOrders() {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) {
+        logger.error('Error loading orders', error)
+        throw error
+      }
 
       const orders = (data || []) as SalesOrder[]
+      logger.debug(`Loaded ${orders.length} orders`)
       store.setOrders(orders)
       return orders
     } catch (error: any) {
       logger.error('Error loading orders', error)
+      const errorMessage = error?.message || error?.details || 'Failed to load sales orders'
       toast.add({
         severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load sales orders'
+        summary: 'Error Loading Orders',
+        detail: errorMessage,
+        life: 5000
       })
+      store.setOrders([]) // Clear store on error
       return []
     } finally {
       loading.value = false
