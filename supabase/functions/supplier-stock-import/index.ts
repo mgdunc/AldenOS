@@ -100,9 +100,11 @@ serve(async (req) => {
       console.log('[supplier-stock-import] First row columns:', Object.keys(rows[0]))
 
       // Get all products with supplier_sku for matching
+      // Use range to fetch all products (Supabase defaults to 1000 row limit)
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, sku, name, supplier_sku, supplier_id')
+        .range(0, 9999) // Fetch up to 10,000 products
 
       if (productsError) {
         console.error('[supplier-stock-import] Failed to fetch products:', productsError)
@@ -129,10 +131,11 @@ serve(async (req) => {
       }
 
       console.log(`[supplier-stock-import] Products with supplier_sku: ${productsWithSupplierSku}`)
+      console.log(`[supplier-stock-import] Total lookup map sizes - supplier_sku: ${productsBySupplierSku.size}, sku: ${productsBySku.size}`)
       console.log(`[supplier-stock-import] Sample supplier_sku values:`, 
-        Array.from(productsBySupplierSku.keys()).slice(0, 5))
+        Array.from(productsBySupplierSku.keys()).slice(0, 10))
       console.log(`[supplier-stock-import] Sample product sku values:`, 
-        Array.from(productsBySku.keys()).slice(0, 5))
+        Array.from(productsBySku.keys()).slice(0, 10))
 
       const matched: Array<{ sku: string; productName: string; quantity: number; productId: string }> = []
       const unmatched: Array<{ sku: string; productName?: string; quantity: number; rawData: any }> = []
@@ -177,14 +180,15 @@ serve(async (req) => {
             quantity,
             rawData: row
           })
-          // Debug log for unmatched SKUs
-          console.warn('[supplier-stock-import] Unmatched SKU:', {
-            sku,
-            normalizedSku,
-            supplierSkuKeys: Array.from(productsBySupplierSku.keys()),
-            skuKeys: Array.from(productsBySku.keys()),
-            row
-          })
+          // Debug log for first 5 unmatched SKUs only
+          if (unmatched.length <= 5) {
+            console.warn('[supplier-stock-import] Unmatched SKU:', {
+              sku,
+              normalizedSku,
+              sampleSupplierSkus: Array.from(productsBySupplierSku.keys()).slice(0, 10),
+              sampleSkus: Array.from(productsBySku.keys()).slice(0, 10)
+            })
+          }
         }
       }
 
