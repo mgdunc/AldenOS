@@ -15,25 +15,51 @@ import Card from 'primevue/card'
 const toast = useToast()
 const exporting = ref(false)
 
+// Helper to fetch all records with pagination (bypasses 1000 row limit)
+const fetchAllRows = async (table: string, select: string, orderBy: string = 'sku') => {
+    const pageSize = 1000
+    let allData: any[] = []
+    let page = 0
+    let hasMore = true
+
+    while (hasMore) {
+        const { data, error } = await supabase
+            .from(table)
+            .select(select)
+            .order(orderBy)
+            .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) throw error
+        
+        if (data && data.length > 0) {
+            allData = [...allData, ...data]
+            page++
+            hasMore = data.length === pageSize
+        } else {
+            hasMore = false
+        }
+    }
+
+    return allData
+}
+
 const exportData = async () => {
     exporting.value = true
     try {
-        // Fetch ALL product data with inventory stats and supplier info
-        const { data: viewData, error: viewError } = await supabase
-            .from('product_inventory_view')
-            .select('*')
-            .order('sku')
+        // Fetch ALL product data with inventory stats (paginated to bypass 1000 limit)
+        const viewData = await fetchAllRows('product_inventory_view', '*', 'sku')
         
-        if (viewError) throw viewError
-        if (!viewData) return
+        if (!viewData || viewData.length === 0) {
+            toast.add({ severity: 'warn', summary: 'No Data', detail: 'No products found to export' })
+            return
+        }
 
-        // Fetch additional product fields not in the view (supplier_id, supplier_sku, carton_barcode, shopify IDs)
-        const { data: productDetails, error: productError } = await supabase
-            .from('products')
-            .select('id, supplier_id, supplier_sku, carton_barcode, shopify_product_id, shopify_variant_id, created_at, updated_at')
-            .order('sku')
-        
-        if (productError) throw productError
+        // Fetch additional product fields not in the view (paginated)
+        const productDetails = await fetchAllRows(
+            'products', 
+            'id, supplier_id, supplier_sku, carton_barcode, shopify_product_id, shopify_variant_id, created_at, updated_at',
+            'sku'
+        )
 
         // Fetch suppliers for name lookup
         const { data: suppliers } = await supabase
