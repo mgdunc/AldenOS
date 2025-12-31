@@ -105,26 +105,42 @@ serve(async (req) => {
         .select('id, sku, name, supplier_sku, supplier_id')
 
       if (productsError) {
+        console.error('[supplier-stock-import] Failed to fetch products:', productsError)
         throw new Error('Failed to fetch products for matching')
       }
+
+      console.log(`[supplier-stock-import] Fetched ${products?.length || 0} products for matching`)
 
       // Create lookup maps for matching
       const productsBySupplierSku = new Map<string, any>()
       const productsBySku = new Map<string, any>()
 
+      let productsWithSupplierSku = 0
       for (const product of products || []) {
         if (product.supplier_sku) {
           productsBySupplierSku.set(product.supplier_sku.toLowerCase().trim(), product)
+          productsWithSupplierSku++
         }
         if (product.sku) {
           productsBySku.set(product.sku.toLowerCase().trim(), product)
         }
       }
 
+      console.log(`[supplier-stock-import] Products with supplier_sku: ${productsWithSupplierSku}`)
+      console.log(`[supplier-stock-import] Sample supplier_sku values:`, 
+        Array.from(productsBySupplierSku.keys()).slice(0, 5))
+      console.log(`[supplier-stock-import] Sample product sku values:`, 
+        Array.from(productsBySku.keys()).slice(0, 5))
+
       const matched: Array<{ sku: string; productName: string; quantity: number; productId: string }> = []
       const unmatched: Array<{ sku: string; productName?: string; quantity: number; rawData: any }> = []
 
+      // Log first few rows from spreadsheet for debugging
+      console.log('[supplier-stock-import] Sample SKUs from spreadsheet:', 
+        rows.slice(0, 5).map(r => findColumnValue(r, [skuColumn, 'SKU', 'sku', 'Sku', 'supplier_sku', 'Supplier SKU', 'Part Number', 'Item Code', 'Code'])))
+
       // Process each row
+      let skippedNoSku = 0
       for (const row of rows) {
         // Try to find SKU column (case-insensitive)
         const skuValue = findColumnValue(row, [skuColumn, 'SKU', 'sku', 'Sku', 'supplier_sku', 'Supplier SKU', 'Part Number', 'Item Code', 'Code'])
@@ -132,6 +148,7 @@ serve(async (req) => {
         const nameValue = findColumnValue(row, [nameColumn, 'Product Name', 'Name', 'name', 'Description', 'Product', 'Item'])
 
         if (!skuValue) {
+          skippedNoSku++
           continue // Skip rows without SKU
         }
 
@@ -140,7 +157,9 @@ serve(async (req) => {
 
         // Try to match by supplier_sku first, then by regular sku
         const normalizedSku = sku.toLowerCase()
-        let product = productsBySupplierSku.get(normalizedSku) || productsBySku.get(normalizedSku)
+        const matchedBySupplierSku = productsBySupplierSku.get(normalizedSku)
+        const matchedBySku = productsBySku.get(normalizedSku)
+        let product = matchedBySupplierSku || matchedBySku
 
         if (product) {
           matched.push({
@@ -159,7 +178,14 @@ serve(async (req) => {
         }
       }
 
+      console.log(`[supplier-stock-import] Skipped rows (no SKU): ${skippedNoSku}`)
       console.log(`[supplier-stock-import] Matched: ${matched.length}, Unmatched: ${unmatched.length}`)
+      
+      // Log a few unmatched examples for debugging
+      if (unmatched.length > 0) {
+        console.log('[supplier-stock-import] Sample unmatched SKUs:', 
+          unmatched.slice(0, 5).map(u => u.sku))
+      }
 
       // Insert matched stock levels (upsert to handle duplicates)
       if (matched.length > 0) {
