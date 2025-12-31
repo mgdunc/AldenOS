@@ -195,9 +195,9 @@ onMounted(() => {
     fetchStats()
 })
 
-const getSeverity = (val: number, reorderPoint: number = 0) => {
+const getSeverity = (val: number) => {
     if (val <= 0) return 'danger'
-    if (val <= reorderPoint) return 'warn'
+    if (val <= 10) return 'warn'
     return 'success'
 }
 
@@ -465,7 +465,7 @@ const exportProductsCsv = async () => {
                 <Column field="available" header="Available" sortable style="width: 9rem">
                     <template #body="{ data }">
                         <div class="flex align-items-center gap-2">
-                            <Tag :severity="getSeverity(data.available, data.reorder_point)" class="font-bold">
+                            <Tag :severity="getSeverity(data.available)" class="font-bold">
                                 {{ data.available }}
                             </Tag>
                             <Button 

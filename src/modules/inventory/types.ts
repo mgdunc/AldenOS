@@ -10,8 +10,6 @@ export interface Product {
   weight_unit?: string
   list_price?: number
   cost_price?: number
-  reorder_point?: number
-  reorder_quantity?: number
   supplier_id?: string
   supplier_sku?: string
   is_active: boolean
@@ -108,8 +106,6 @@ export interface ProductImportRow {
   cost_price?: number
   supplier_sku?: string
   weight?: number
-  reorder_point?: number
-  reorder_quantity?: number
 }
 
 export interface InventoryImportRow {

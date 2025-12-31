@@ -21,7 +21,7 @@ export const useInventoryStore = defineStore('inventory', () => {
       total_products: products.value.length,
       active_products: products.value.filter(p => p.is_active).length,
       low_stock_count: products.value.filter(p => 
-        p.available_stock > 0 && p.available_stock <= (p.reorder_point || 0)
+        p.available_stock > 0 && p.available_stock <= 10
       ).length,
       out_of_stock_count: products.value.filter(p => p.available_stock === 0).length,
       total_value: products.value.reduce((sum, p) => 
