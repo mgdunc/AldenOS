@@ -16,6 +16,17 @@ export function useSalesOrders() {
     store.loading = true
 
     try {
+      // First try a simple query to see if basic access works
+      const { count, error: countError } = await supabase
+        .from('sales_orders')
+        .select('*', { count: 'exact', head: true })
+      
+      if (countError) {
+        logger.error('Count query error:', countError)
+      } else {
+        logger.debug(`Total orders in database: ${count}`)
+      }
+
       let query = supabase
         .from('sales_orders')
         .select(`
@@ -68,17 +79,45 @@ export function useSalesOrders() {
       const { data, error } = await query
 
       if (error) {
-        logger.error('Error loading orders', error)
-        throw error
+        logger.error('Error loading orders with relationships:', error)
+        
+        // Fallback: Try without relationships in case there's a FK issue
+        logger.debug('Attempting fallback query without relationships')
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('sales_orders')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (fallbackError) {
+          logger.error('Fallback query also failed:', fallbackError)
+          throw error // Throw original error
+        }
+        
+        logger.debug(`Fallback query loaded ${fallbackData?.length || 0} orders`)
+        const orders = (fallbackData || []) as SalesOrder[]
+        store.setOrders(orders)
+        return orders
       }
 
       const orders = (data || []) as SalesOrder[]
-      logger.debug(`Loaded ${orders.length} orders`)
+      logger.debug(`Loaded ${orders.length} orders with relationships`)
+      
+      if (orders.length === 0 && count && count > 0) {
+        logger.warn(`Query returned 0 orders but database has ${count} orders. Possible relationship issue.`)
+        toast.add({
+          severity: 'warn',
+          summary: 'No Orders Displayed',
+          detail: `Found ${count} orders in database but query returned none. Check relationships.`,
+          life: 5000
+        })
+      }
+      
       store.setOrders(orders)
       return orders
     } catch (error: any) {
       logger.error('Error loading orders', error)
-      const errorMessage = error?.message || error?.details || 'Failed to load sales orders'
+      const errorMessage = error?.message || error?.details || error?.hint || 'Failed to load sales orders'
+      console.error('Full error object:', error)
       toast.add({
         severity: 'error',
         summary: 'Error Loading Orders',
