@@ -126,7 +126,7 @@ const saveIntegration = async () => {
   }
 }
 
-// Test connection
+// Test connection via Edge Function (avoids CORS)
 const testConnection = async () => {
   if (!form.value.shop_url || !form.value.access_token) {
     toast.add({ severity: 'warn', summary: 'Missing Fields', detail: 'Please fill in shop URL and access token first' })
@@ -135,23 +135,23 @@ const testConnection = async () => {
 
   saving.value = true
   try {
-    const shopUrl = form.value.shop_url.replace(/^https?:\/\//, '').replace(/\/$/, '')
-    const response = await fetch(`https://${shopUrl}/admin/api/2024-01/shop.json`, {
-      headers: {
-        'X-Shopify-Access-Token': form.value.access_token,
-        'Content-Type': 'application/json'
+    const { data, error } = await supabase.functions.invoke('shopify-test-connection', {
+      body: {
+        shop_url: form.value.shop_url,
+        access_token: form.value.access_token
       }
     })
 
-    if (!response.ok) {
-      throw new Error(`Connection failed: ${response.status} ${response.statusText}`)
+    if (error) throw error
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Connection failed')
     }
 
-    const data = await response.json()
     toast.add({ 
       severity: 'success', 
       summary: 'Connection Successful', 
-      detail: `Connected to ${data.shop?.name || shopUrl}` 
+      detail: `Connected to ${data.shop?.name || form.value.shop_url}` 
     })
   } catch (e: any) {
     logger.error('Connection test failed', e)
