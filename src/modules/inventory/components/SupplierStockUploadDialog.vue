@@ -150,8 +150,8 @@ const parseFileHeaders = async (file: File) => {
   } finally {
     parsing.value = false
   }
-// User-facing error for missing columns
-const toast = useToast()
+// ...existing code...
+
 function showNoColumnsError() {
   toast.add({
     severity: 'error',
