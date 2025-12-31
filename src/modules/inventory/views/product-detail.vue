@@ -757,7 +757,7 @@ const isLinkedToShopify = computed(() => {
                 <div class="surface-card shadow-2 border-round overflow-hidden flex-1" style="min-height: 400px;">
                     <TimelineSidebar 
                         v-if="product" 
-                        :entity-id="product.id" 
+                        :entity-id="product.product_id" 
                         entity-type="product" 
                     />
                 </div>
