@@ -16,6 +16,22 @@ export function useSalesOrders() {
     store.loading = true
 
     try {
+      // Check authentication first
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      console.log('[loadOrders] Auth check - User:', user?.id || 'NOT AUTHENTICATED', 'Error:', authError)
+      
+      if (!user) {
+        console.error('[loadOrders] User not authenticated!')
+        toast.add({
+          severity: 'error',
+          summary: 'Authentication Required',
+          detail: 'Please log in to view orders',
+          life: 5000
+        })
+        store.setOrders([])
+        return []
+      }
+
       // First try a simple query to see if basic access works
       console.log('[loadOrders] Starting count query...')
       const { count, error: countError } = await supabase
@@ -28,6 +44,19 @@ export function useSalesOrders() {
       } else {
         console.log(`[loadOrders] Total orders in database: ${count}`)
         logger.debug(`Total orders in database: ${count}`)
+      }
+
+      // Also try a simple SELECT to see if we get any rows
+      console.log('[loadOrders] Testing simple SELECT query...')
+      const { data: testData, error: testError } = await supabase
+        .from('sales_orders')
+        .select('id, order_number, status')
+        .limit(5)
+      
+      if (testError) {
+        console.error('[loadOrders] Simple SELECT error:', testError)
+      } else {
+        console.log(`[loadOrders] Simple SELECT returned ${testData?.length || 0} rows:`, testData)
       }
 
       let query = supabase
