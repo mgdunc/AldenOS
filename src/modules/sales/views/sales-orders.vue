@@ -256,6 +256,12 @@ onMounted(fetchOrders)
 
                 <Column field="order_number" header="Order #" sortable class="font-bold text-primary cursor-pointer white-space-nowrap" />
                 
+                <Column field="order_date" header="Order Date" sortable style="width: 120px">
+                    <template #body="{ data }">
+                        <span class="text-sm">{{ formatDate(data.order_date || data.created_at) }}</span>
+                    </template>
+                </Column>
+                
                 <Column field="display_customer_name" header="Customer" sortable>
                     <template #body="{ data }">
                         <div class="flex flex-column">
