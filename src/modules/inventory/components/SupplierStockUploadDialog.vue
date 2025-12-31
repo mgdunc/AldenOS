@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useSupplierStock, type ImportResult } from '../composables/useSupplierStock'
 import { useInventory } from '../composables/useInventory'
+import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -150,7 +151,6 @@ const parseFileHeaders = async (file: File) => {
     parsing.value = false
   }
 // User-facing error for missing columns
-import { useToast } from 'primevue/usetoast'
 const toast = useToast()
 function showNoColumnsError() {
   toast.add({
