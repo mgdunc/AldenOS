@@ -175,6 +175,14 @@ serve(async (req) => {
             quantity,
             rawData: row
           })
+          // Debug log for unmatched SKUs
+          console.warn('[supplier-stock-import] Unmatched SKU:', {
+            sku,
+            normalizedSku,
+            supplierSkuKeys: Array.from(productsBySupplierSku.keys()),
+            skuKeys: Array.from(productsBySku.keys()),
+            row
+          })
         }
       }
 
