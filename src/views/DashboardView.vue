@@ -51,14 +51,14 @@ const loadDashboardData = async () => {
     // Load sales orders
     const { data: orders } = await supabase
       .from('sales_orders')
-      .select('status, total')
+      .select('status, total, is_open')
     
     if (orders) {
       stats.value.total_revenue = orders
-        .filter(o => o.status !== 'cancelled')
+        .filter(o => o.status !== 'cancelled' && o.status !== 'draft')
         .reduce((sum, o) => sum + (o.total || 0), 0)
-      stats.value.pending_orders = orders.filter(o => o.status === 'draft' || o.status === 'confirmed').length
-      stats.value.fulfilled_orders = orders.filter(o => o.status === 'fulfilled').length
+      stats.value.pending_orders = orders.filter(o => o.is_open === true).length
+      stats.value.fulfilled_orders = orders.filter(o => o.status === 'shipped').length
     }
 
     // Load purchase orders
@@ -67,8 +67,10 @@ const loadDashboardData = async () => {
       .select('status, total')
     
     if (pos) {
-      stats.value.active_pos = pos.filter(p => p.status === 'submitted').length
-      stats.value.total_po_value = pos.reduce((sum, p) => sum + (p.total || 0), 0)
+      stats.value.active_pos = pos.filter(p => p.status === 'placed' || p.status === 'partial_received').length
+      stats.value.total_po_value = pos
+        .filter(p => p.status !== 'cancelled')
+        .reduce((sum, p) => sum + (p.total || 0), 0)
     }
   } finally {
     loading.value = false
