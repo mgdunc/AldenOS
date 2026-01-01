@@ -747,8 +747,8 @@ const isLinkedToShopify = computed(() => {
                             <div class="font-medium text-700 mb-1">Not linked to Shopify</div>
                             <div class="text-500 text-sm">This product was created manually or hasn't been synced yet.</div>
                         </div>
-                        <router-link to="/settings/shopify" class="no-underline">
-                            <Button label="Go to Shopify Settings" icon="pi pi-cog" severity="secondary" outlined size="small" />
+                        <router-link to="/shopify" class="no-underline">
+                            <Button label="Go to Shopify" icon="pi pi-shopping-bag" severity="secondary" outlined size="small" />
                         </router-link>
                     </div>
                 </div>
