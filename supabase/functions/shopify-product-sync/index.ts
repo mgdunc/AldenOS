@@ -89,15 +89,7 @@ serve(async (req: Request) => {
               // Update existing product
               const { error } = await supabase
                 .from('products')
-              .update(productData)
-              .eq('id', existingProduct.id)
-
-            if (error) {
-              await logger.error(`Failed to update product ${sku}`, error)
-              errorCount++
-            } else {
-              updatedCount++
-.update(productData)
+                .update(productData)
                 .eq('id', existingProduct.id)
 
               if (error) {
