@@ -36,16 +36,16 @@ const stats = ref<Stats>({
 const loadDashboardData = async () => {
   loading.value = true
   try {
-    // Load products
+    // Load products from inventory view (includes calculated inventory levels)
     const { data: products } = await supabase
-      .from('products')
-      .select('available_stock, cost')
+      .from('product_inventory_view')
+      .select('available, cost_price')
     
     if (products) {
       stats.value.total_products = products.length
-      stats.value.total_value = products.reduce((sum, p) => sum + ((p.available_stock || 0) * (p.cost || 0)), 0)
-      stats.value.out_of_stock_count = products.filter(p => (p.available_stock || 0) === 0).length
-      stats.value.low_stock_count = products.filter(p => (p.available_stock || 0) > 0 && (p.available_stock || 0) < 10).length
+      stats.value.total_value = products.reduce((sum, p) => sum + ((p.available || 0) * (p.cost_price || 0)), 0)
+      stats.value.out_of_stock_count = products.filter(p => (p.available || 0) <= 0).length
+      stats.value.low_stock_count = products.filter(p => (p.available || 0) > 0 && (p.available || 0) <= 10).length
     }
 
     // Load sales orders
