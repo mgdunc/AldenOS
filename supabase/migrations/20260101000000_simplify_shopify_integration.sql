@@ -9,7 +9,29 @@ DROP TABLE IF EXISTS sync_queue CASCADE;
 DROP TABLE IF EXISTS stock_commitments CASCADE;
 DROP TABLE IF EXISTS integrations CASCADE;
 
--- 2. Create simplified sync tracking table
+-- 2. Create simple credentials table (optional - env vars still work)
+CREATE TABLE IF NOT EXISTS shopify_credentials (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shop_url TEXT NOT NULL,
+  access_token TEXT NOT NULL, -- Encrypted at rest via Supabase
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Only allow one active configuration
+  CONSTRAINT single_active_config CHECK (is_active = true)
+);
+
+-- Enable RLS for security
+ALTER TABLE shopify_credentials ENABLE ROW LEVEL SECURITY;
+
+-- Only authenticated users can manage credentials
+CREATE POLICY "Authenticated users can manage credentials"
+  ON shopify_credentials FOR ALL
+  TO authenticated
+  USING (true);
+
+-- 3. Create simplified sync tracking table
 CREATE TABLE IF NOT EXISTS shopify_syncs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sync_type TEXT NOT NULL CHECK (sync_type IN ('products', 'orders')),
