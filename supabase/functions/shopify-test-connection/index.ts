@@ -1,6 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from "../_shared/cors.ts"
+import { getSupabaseEnv } from '../_shared/env.ts'
+import { getShopifyConfig } from '../_shared/shopify-config.ts'
 
 console.log("Shopify Test Connection Function Started")
 
@@ -11,13 +14,41 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { shop_url, access_token } = await req.json()
+    // Parse request body (may be empty)
+    let bodyShopUrl: string | undefined
+    let bodyAccessToken: string | undefined
+    
+    try {
+      const body = await req.json()
+      bodyShopUrl = body.shop_url
+      bodyAccessToken = body.access_token
+    } catch {
+      // Empty body is OK - we'll read from database
+    }
+
+    // Get config - either from request body or database/env
+    let shop_url: string
+    let access_token: string
+
+    if (bodyShopUrl && bodyAccessToken) {
+      // Use provided credentials (for testing before saving)
+      shop_url = bodyShopUrl
+      access_token = bodyAccessToken
+    } else {
+      // Read from database or environment
+      const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      
+      const config = await getShopifyConfig(supabase)
+      shop_url = config.shopUrl
+      access_token = config.accessToken
+    }
 
     if (!shop_url || !access_token) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Missing shop_url or access_token" 
+          error: "No Shopify credentials configured. Please add them in Settings." 
         }),
         { 
           status: 400,

@@ -25,12 +25,18 @@ const hasCredentials = ref(false)
 
 async function loadCredentials() {
   try {
-    // Check if credentials exist in Supabase secrets (via edge function)
-    const { data, error } = await supabase.functions.invoke('shopify-test-connection')
+    // Check if credentials exist in the database
+    const { data, error } = await supabase
+      .from('shopify_credentials')
+      .select('shop_url')
+      .eq('is_active', true)
+      .single()
     
-    if (!error && data?.success) {
+    if (!error && data) {
       hasCredentials.value = true
-      credentials.value.shop_url = data.shop?.domain || ''
+      credentials.value.shop_url = data.shop_url
+    } else {
+      hasCredentials.value = false
     }
   } catch (error) {
     hasCredentials.value = false
@@ -98,7 +104,13 @@ async function testConnection() {
   connectionStatus.value = null
   
   try {
-    const { data, error } = await supabase.functions.invoke('shopify-test-connection')
+    // Pass credentials to test function
+    const { data, error } = await supabase.functions.invoke('shopify-test-connection', {
+      body: {
+        shop_url: credentials.value.shop_url,
+        access_token: credentials.value.access_token
+      }
+    })
     
     if (error) throw error
     
