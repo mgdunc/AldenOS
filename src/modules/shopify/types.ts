@@ -1,53 +1,26 @@
-export interface ShopifyIntegrationSettings {
-  shop_url: string
-  access_token: string
-  webhook_secret?: string
-  webhooks?: ShopifyWebhook[]
-}
+/**
+ * Simplified Shopify types for single-store integration
+ */
 
-export interface ShopifyIntegration {
+export interface ShopifySync {
   id: string
-  provider: 'shopify'
-  name: string
-  settings: ShopifyIntegrationSettings
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface ShopifySyncJob {
-  id: string
-  integration_id: string
-  integration_type: 'shopify'
-  job_type: 'product_sync' | 'order_sync'
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
-  total_items?: number
-  processed_items?: number
-  matched_items?: number
-  updated_items?: number
-  error_count?: number
-  error_message?: string
+  sync_type: 'products' | 'orders'
+  status: 'running' | 'completed' | 'failed'
+  total_items: number
+  processed_items: number
+  created_count: number
+  updated_count: number
+  error_count: number
+  current_page: number
+  progress_pct: number
+  started_at: string
+  completed_at: string | null
+  error_message: string | null
   metadata?: Record<string, any>
-  started_at?: string
-  completed_at?: string
-  created_at: string
 }
 
-export interface ShopifyIntegrationLog {
-  id: string
-  integration_id: string
-  event_type: string
-  message: string
-  level: 'info' | 'success' | 'warning' | 'error'
-  metadata?: Record<string, any>
-  created_at: string
-}
-
-export interface ShopifyUnmatchedProduct {
-  id: string
-  integration_id: string
-  external_product_id: string
-  external_variant_id: string
+// Shopify API types
+export interface ShopifyProduct {
   title: string
   variant_title?: string
   sku?: string

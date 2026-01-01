@@ -1,243 +1,255 @@
-# Shopify Module Improvements
+# Shopify Module - Ultra Simplified
 
 ## Overview
-The Shopify module has been completely refactored to follow AldenOS architectural patterns and best practices. This includes proper separation of concerns, shared composables, centralized state management, and comprehensive testing.
+Single-store Shopify integration with direct function invocation and real-time progress tracking.
 
-## What's New
+**Key Features:**
+- ✅ No multi-store complexity
+- ✅ No queue system
+- ✅ Direct edge function invocation
+- ✅ Real-time progress via Postgres changes
+- ✅ Environment variable configuration
+- ✅ ~90% less code than previous version
 
-### 1. **TypeScript Types** (`types.ts`)
-- Comprehensive type definitions for all Shopify entities
-- Includes: `ShopifyIntegration`, `ShopifySyncJob`, `ShopifyProduct`, `ShopifyOrder`, `ShopifyWebhook`, etc.
-- Ensures type safety across the entire module
+## Configuration
 
-### 2. **Pinia Store** (`store.ts`)
-- Centralized state management for Shopify integrations
-- Computed properties for active integrations
-- CRUD operations for managing integration state
-- Reactive state updates across all components
+### Environment Variables
+Set these in your edge functions configuration:
 
-### 3. **Composables** (`composables/`)
+```env
+SHOPIFY_SHOP_URL=mystore.myshopify.com
+SHOPIFY_ACCESS_TOKEN=shpat_xxxxxxxxxxxxx
+SHOPIFY_API_VERSION=2024-01
+```
 
-#### `useShopifyIntegration.ts`
-- Handles all integration CRUD operations
-- Features:
-  - Load all integrations or a specific one
-  - Create, update, delete integrations
-  - Test connection to Shopify API
-  - Validate shop URL format (must end with `.myshopify.com`)
-  - Centralized toast notifications
+No database configuration needed!
 
-#### `useShopifySync.ts`
-- Manages product and order sync operations
-- Features:
-  - Real-time job progress tracking via Supabase Realtime
-  - Live log streaming
-  - Progress percentage calculation
-  - Start, cancel, and monitor sync operations
-  - Automatic cleanup of subscriptions
-  - Works with both `product_sync` and `order_sync` job types
+## Architecture
 
-#### `useShopifyWebhooks.ts`
-- Webhook management with real Shopify API integration
-- Features:
-  - Register webhooks with Shopify
-  - Delete webhooks from Shopify
-  - Sync webhooks from Shopify API
-  - Update local database with webhook state
-  - Comprehensive error handling
+### Database Schema
+Single table for sync tracking:
 
-### 4. **Refactored Components**
+```sql
+CREATE TABLE shopify_syncs (
+  id UUID PRIMARY KEY,
+  sync_type TEXT CHECK (sync_type IN ('products', 'orders')),
+  status TEXT CHECK (status IN ('running', 'completed', 'failed')),
+  
+  -- Counters
+  total_items INT,
+  processed_items INT,
+  created_count INT,
+  updated_count INT,
+  error_count INT,
+  
+  -- Progress
+  current_page INT,
+  progress_pct INT,
+  
+  -- Timing
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  
+  error_message TEXT
+);
+```
 
-#### `ShopifySettingsView.vue`
-- Now uses Pinia store and composables
-- Cleaner separation of concerns
-- Reactive state management
+Product/Order linkage via existing columns:
+- `products.shopify_product_id`, `shopify_variant_id`, `shopify_inventory_item_id`
+- `sales_orders.shopify_order_id`, `shopify_order_number`
 
-#### `ShopifyIntegrationCard.vue`
-- **New Features:**
-  - Shop URL validation with error messages
-  - "Test Connection" button
-  - Required field indicators
-  - Improved form validation
-  - Disabled save button when form is invalid
-- Uses `useShopifyIntegration` composable
+### Frontend Structure
 
-#### `ShopifyProductSyncCard.vue`
-- Refactored to use `useShopifySync` composable
-- **Improvements:**
-  - Cleaner code (removed duplicate subscription logic)
-  - Better error handling
-  - "Clear Logs" button
-  - Improved progress display with matched items count
-  - Better empty state handling
+```
+src/modules/shopify/
+├── views/
+│   └── shopify-dashboard.vue       Single dashboard view
+├── composables/
+│   └── useShopifySync.ts            Real-time sync composable
+├── components/
+│   └── SyncCard.vue                 Reusable sync card
+├── routes.ts                        Single route
+└── types.ts                         Minimal types
+```
 
-#### `ShopifyOrderSyncCard.vue`
-- Refactored to use `useShopifySync` composable
-- Now fully functional (previously was placeholder)
-- Same improvements as ProductSyncCard
+**Total Frontend Code:** ~400 lines
 
-#### `ShopifyWebhooksCard.vue`
-- Refactored to use `useShopifyWebhooks` composable
-- **New Features:**
-  - Real API integration (no longer simulated)
-  - Sync webhooks from Shopify
-  - Dynamic webhook address generation
-  - More webhook topic options
+### Edge Functions
 
-#### `ShopifyUnmatchedProducts.vue`
-- **New Features:**
-  - "Import All" button for bulk import
-  - "Delete Selected" button to remove unmatched items
-  - Improved toolbar layout
+```
+supabase/functions/
+├── shopify-product-sync/          Products & variants
+├── shopify-order-sync/            Orders & line items  
+└── shopify-test-connection/      Test credentials
+```
 
-### 5. **Edge Function** (`supabase/functions/shopify-order-sync/`)
-- New Edge Function for syncing orders from Shopify
-- Features:
-  - Fetches orders from last 30 days
-  - Creates sales orders with line items
-  - Maps Shopify addresses to AldenOS format
-  - Handles SKU matching (to be enhanced)
-  - Comprehensive logging
-  - Error handling with partial success tracking
+**Total Backend Code:** ~300 lines
 
-### 6. **Tests** (`*.spec.ts`)
-- Unit tests for Pinia store
-- Unit tests for composables
-- Mocked Supabase client to avoid network calls
-- Tests for validation logic
+## Usage
 
-## Architecture Benefits
+### Starting a Sync
 
-### Before
-- ❌ Direct Supabase calls in components
-- ❌ Duplicate subscription logic
-- ❌ No type safety
-- ❌ No centralized state
-- ❌ No tests
+The frontend directly invokes the edge function:
 
-### After
-- ✅ Clean separation: Components → Composables → API
-- ✅ Reusable business logic
-- ✅ Full TypeScript coverage
-- ✅ Centralized state with Pinia
-- ✅ Comprehensive tests
-- ✅ Consistent error handling
-- ✅ Real API integration (webhooks)
-
-## Usage Examples
-
-### Using the Integration Composable
 ```typescript
-import { useShopifyIntegration } from '../composables/useShopifyIntegration'
+await supabase.functions.invoke('shopify-product-sync')
+// or
+await supabase.functions.invoke('shopify-order-sync')
+```
 
+Progress updates automatically via realtime subscription to `shopify_syncs` table.
+
+### Using the Composable
+
+```vue
+<script setup>
+import { useShopifySync } from '@/modules/shopify/composables/useShopifySync'
+
+// Create sync instance for products
+const { syncing, progress, stats, startSync } = useShopifySync('products')
+</script>
+
+<template>
+  <Button 
+    :label="syncing ? 'Syncing...' : 'Start Sync'"
+    :disabled="syncing"
+    @click="startSync"
+  />
+  <ProgressBar v-if="syncing" :value="progress" />
+</template>
+```
+
+### Composable API
+
+```typescript
 const {
-  loading,
-  saving,
-  loadIntegrations,
-  createIntegration,
-  updateIntegration,
-  testConnection,
-  validateShopUrl
-} = useShopifyIntegration()
-
-// Validate URL
-const isValid = validateShopUrl('mystore.myshopify.com') // true
-
-// Test connection
-await testConnection('mystore.myshopify.com', 'token123')
-
-// Create integration
-await createIntegration('My Store', {
-  shop_url: 'mystore.myshopify.com',
-  access_token: 'token123'
-})
+  syncing,          // ref<boolean>
+  currentSync,      // ref<ShopifySync | null>
+  history,          // ref<ShopifySync[]>
+  progress,         // computed<number> (0-100)
+  statusSeverity,   // computed<string> (info/success/danger)
+  stats,            // computed<Stats | null>
+  startSync,        // () => Promise<void>
+  formatSyncDate,   // (date: string) => string
+  getDuration       // (sync: ShopifySync) => string
+} = useShopifySync('products' | 'orders')
 ```
 
-### Using the Sync Composable
-```typescript
-import { useShopifySync } from '../composables/useShopifySync'
+## How It Works
 
-const {
-  syncing,
-  currentJob,
-  progressPercentage,
-  liveLogs,
-  startSync,
-  cancelSync
-} = useShopifySync(integrationId, 'product_sync')
+### Product Sync Flow
 
-// Start sync
-await startSync()
+1. User clicks "Start Sync" in dashboard
+2. Frontend calls `shopify-product-sync` edge function
+3. Edge function:
+   - Creates `shopify_syncs` record with status='running'
+   - Paginates through Shopify products
+   - For each product variant:
+     - Checks if exists by SKU or shopify_variant_id
+     - Creates or updates product record
+   - Updates progress in real-time
+   - Marks sync as completed/failed
+4. Frontend receives real-time updates via Postgres changes subscription
+5. UI updates progress bar and stats automatically
 
-// Monitor progress
-watch(progressPercentage, (percent) => {
-  console.log(`Progress: ${percent}%`)
-})
+### Order Sync Flow
 
-// Cancel if needed
-if (needsToStop) {
-  await cancelSync()
-}
-```
+1. Same pattern as products
+2. For each order:
+   - Creates/updates sales_order
+   - Syncs line items
+   - Matches products by SKU or shopify_variant_id
+3. Maps Shopify fulfillment status to WMS status
+4. Real-time progress updates
 
-### Using the Store
-```typescript
-import { useShopifyStore } from '../store'
+## Benefits
 
-const store = useShopifyStore()
+### Compared to Previous Architecture
 
-// Access state
-console.log(store.integrations)
-console.log(store.selectedIntegration)
-console.log(store.activeIntegrations)
+| Feature | Old | New |
+|---------|-----|-----|
+| **Lines of Code** | ~3000 | ~700 |
+| **Tables** | 6 | 1 |
+| **Edge Functions** | 7 | 3 |
+| **Views** | 4 | 1 |
+| **Composables** | 4 | 1 |
+| **Configuration** | Database | Environment Variables |
+| **Queue System** | Yes | No |
+| **Multi-Store** | Yes | No |
+| **Complexity** | High | Low |
 
-// Update state
-store.setSelectedIntegration(integration)
-store.updateIntegration(id, { is_active: false })
-```
+### Performance Improvements
 
-## Migration Notes
+- ✅ **Faster sync start** - No queue overhead
+- ✅ **Direct invocation** - No processor polling
+- ✅ **Real-time updates** - Postgres changes, no polling
+- ✅ **Simpler debugging** - Single execution path
+- ✅ **Easier deployment** - Just environment variables
 
-### For New Features
-1. Always use composables for business logic
-2. Use the store for shared state
-3. Add TypeScript types to `types.ts`
-4. Write tests for new composables
+## Deployment
 
-### Testing
-Run tests with:
+### 1. Apply Migration
+
 ```bash
-npm run test
+supabase migration up
 ```
+
+This will:
+- Drop old tables (integrations, sync_queue, etc.)
+- Create new `shopify_syncs` table
+- Add/update product columns
+
+### 2. Deploy Edge Functions
+
+```bash
+supabase functions deploy shopify-product-sync
+supabase functions deploy shopify-order-sync
+supabase functions deploy shopify-test-connection
+```
+
+### 3. Set Environment Variables
+
+In Supabase Dashboard > Edge Functions > Settings:
+
+```
+SHOPIFY_SHOP_URL=mystore.myshopify.com
+SHOPIFY_ACCESS_TOKEN=shpat_xxxxxxxxxxxxx
+```
+
+### 4. Access Dashboard
+
+Navigate to `/shopify` in your application.
+
+## Troubleshooting
+
+### Connection Test Fails
+
+1. Check environment variables are set correctly
+2. Verify Shopify access token has required permissions:
+   - `read_products`
+   - `read_orders`
+   - `read_inventory`
+3. Check shop URL format (no https://, no trailing slash)
+
+### Sync Fails Immediately
+
+1. Check Edge Function logs: `supabase functions logs shopify-product-sync`
+2. Verify database permissions (RLS policies)
+3. Check for rate limiting from Shopify
+
+### Real-time Updates Not Working
+
+1. Verify `shopify_syncs` is added to realtime publication
+2. Check browser console for subscription errors
+3. Ensure RLS policies allow authenticated users to read syncs
 
 ## Future Enhancements
 
-### Planned
-- [ ] Edge Functions for webhook management (`shopify-register-webhook`, `shopify-delete-webhook`, `shopify-list-webhooks`)
-- [ ] Edge Function for testing connection (`shopify-test-connection`)
-- [ ] Enhanced SKU matching in order sync
-- [ ] Product image sync
-- [ ] Inventory level sync (bidirectional)
-- [ ] Bulk product import improvements
-- [ ] Webhook verification middleware
+Possible additions (all optional):
+- Webhook support for automatic syncs
+- Incremental syncs (only changed items)
+- Inventory level syncing
+- Fulfillment status push-back to Shopify
+- Customer syncing
 
-### Possible
-- [ ] Real-time inventory sync
-- [ ] Fulfillment status updates back to Shopify
-- [ ] Customer sync
-- [ ] Automatic retry for failed syncs
-- [ ] Sync scheduling (cron-based)
-
-## Related Files
-- Database migrations: `supabase/migrations/20251219200000_add_shopify_integration.sql`
-- Shared Shopify client: `supabase/functions/_shared/shopify.ts`
-- Edge Functions: `supabase/functions/shopify-*`
-
-## Breaking Changes
-None - this is a refactor with backward compatibility maintained.
-
-## Dependencies
-- `@supabase/supabase-js` - Database and Edge Functions
-- `pinia` - State management
-- `primevue` - UI components
-- `vitest` - Testing framework
+All can be added without changing the core architecture!
