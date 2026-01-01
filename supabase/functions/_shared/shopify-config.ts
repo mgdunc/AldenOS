@@ -91,4 +91,3 @@ export function isShopifyConfigured(): boolean {
   const accessToken = Deno.env.get('SHOPIFY_ACCESS_TOKEN')
   return Boolean(shopUrl && accessToken)
 }
-}
