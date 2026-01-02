@@ -121,6 +121,7 @@ const doAdjustStock = async () => {
         modal 
         :header="`${product?.sku || 'Product'} Inventory Details`"
         :style="{ width: '50rem' }"
+        dismissableMask
     >
         <div v-if="product">
             <h3 class="mt-0 mb-3 text-lg font-medium">{{ product.name }}</h3>

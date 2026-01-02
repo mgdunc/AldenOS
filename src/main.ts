@@ -23,10 +23,6 @@ app.use(ConfirmationService)
 app.use(PrimeVue, {
     theme: {
         preset: Aura
-    },
-    // Global component defaults
-    dialog: {
-        dismissableMask: true
     }
 })
 

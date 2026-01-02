@@ -288,6 +288,7 @@ onMounted(() => {
       header="Shopify Credentials"
       :modal="true"
       :style="{ width: '500px' }"
+      dismissableMask
     >
       <div class="flex flex-column gap-4">
         <Message severity="info" :closable="false">

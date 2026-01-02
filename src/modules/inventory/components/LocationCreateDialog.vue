@@ -84,6 +84,7 @@ const handleSave = async () => {
         :header="locationToEdit ? 'Edit Location' : 'New Location'" 
         :modal="true" 
         :style="{ width: '450px' }"
+        dismissableMask
     >
         <div class="flex flex-column gap-3">
             <div class="flex flex-column gap-2">

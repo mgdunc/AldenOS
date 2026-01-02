@@ -389,7 +389,7 @@ onMounted(fetchData)
         </div>
     </div>
 
-    <Dialog v-model:visible="showReceiptsDialog" :header="`Receipt History: ${selectedProductSku}`" modal :style="{ width: '50vw' }">
+    <Dialog v-model:visible="showReceiptsDialog" :header="`Receipt History: ${selectedProductSku}`" modal :style="{ width: '50vw' }" dismissableMask>
         <DataTable :value="selectedProductReceipts" :loading="receiptsLoading" size="small" stripedRows>
             <Column field="created_at" header="Date"><template #body="{ data }">{{ new Date(data.created_at).toLocaleString() }}</template></Column>
             <Column field="locations.name" header="Location" />

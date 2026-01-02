@@ -148,7 +148,7 @@ onMounted(fetchReceipts)
         </div>
 
         <!-- New Receipt Dialog -->
-        <Dialog v-model:visible="showNewReceiptDialog" header="Select Purchase Order to Receive" modal :style="{ width: '50vw' }">
+        <Dialog v-model:visible="showNewReceiptDialog" header="Select Purchase Order to Receive" modal :style="{ width: '50vw' }" dismissableMask>
             <p class="text-500 mb-4">Select an open Purchase Order to create a receipt against.</p>
             
             <DataTable :value="receivablePOs" :loading="loadingPOs" stripedRows selectionMode="single" @row-select="(e) => router.push(`/purchases/${e.data.id}`)">

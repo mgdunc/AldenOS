@@ -247,6 +247,7 @@ const getPreviewValue = (column: string): string => {
     :style="{ width: '800px' }"
     :modal="true"
     :closable="!uploading"
+    dismissableMask
   >
     <Stepper v-model:value="activeStep" linear>
       <StepList>

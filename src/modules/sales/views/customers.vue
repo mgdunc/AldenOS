@@ -153,6 +153,7 @@ onMounted(fetchCustomers)
       :header="editMode ? 'Edit Customer' : 'New Customer'"
       :modal="true"
       :style="{ width: '600px' }"
+      dismissableMask
     >
       <div class="flex flex-column gap-4 pt-4">
         <div class="flex flex-column gap-2">

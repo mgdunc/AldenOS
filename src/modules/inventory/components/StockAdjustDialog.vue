@@ -89,6 +89,7 @@ const onSave = async () => {
         modal 
         header="Adjust Inventory Level" 
         :style="{ width: '30rem' }"
+        dismissableMask
     >
         <div class="flex flex-column gap-3 pt-2">
             <div class="flex flex-column gap-2">

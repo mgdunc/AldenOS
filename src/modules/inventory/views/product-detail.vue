@@ -764,7 +764,7 @@ const isLinkedToShopify = computed(() => {
         </div>
     </div>
 
-    <Dialog v-model:visible="showStockDialog" header="Current Stock Breakdown" :modal="true" :style="{ width: '50vw' }">
+    <Dialog v-model:visible="showStockDialog" header="Current Stock Breakdown" :modal="true" :style="{ width: '50vw' }" dismissableMask>
         <DataTable :value="product?.inventory_snapshots" stripedRows size="small">
             <template #empty>No stock in any location.</template>
             <Column field="locations.name" header="Location" sortable />
@@ -777,7 +777,7 @@ const isLinkedToShopify = computed(() => {
         </template>
     </Dialog>
 
-    <Dialog v-model:visible="showReservedDialog" header="Active Allocations (Reserved)" :modal="true" :style="{ width: '60vw' }">
+    <Dialog v-model:visible="showReservedDialog" header="Active Allocations (Reserved)" :modal="true" :style="{ width: '60vw' }" dismissableMask>
         <DataTable :value="reservedLines" size="small" stripedRows paginator :rows="5">
             <template #empty>No active orders are holding stock.</template>
             <Column field="sales_orders.order_number" header="Order #"><template #body="{ data }"><router-link :to="`/sales/${data.sales_orders.id}`" class="text-primary font-bold">{{ data.sales_orders.order_number }}</router-link></template></Column>
@@ -790,7 +790,7 @@ const isLinkedToShopify = computed(() => {
         </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRequiredDialog" header="Outstanding Sales Demand" :modal="true" :style="{ width: '60vw' }">
+    <Dialog v-model:visible="showRequiredDialog" header="Outstanding Sales Demand" :modal="true" :style="{ width: '60vw' }" dismissableMask>
         <DataTable :value="requiredLines" size="small" stripedRows paginator :rows="5">
             <template #empty>No outstanding orders found.</template>
             <Column field="sales_orders.order_number" header="Order #"><template #body="{ data }"><router-link :to="`/sales/${data.sales_orders.id}`" class="text-primary font-bold">{{ data.sales_orders.order_number }}</router-link></template></Column>
@@ -803,7 +803,7 @@ const isLinkedToShopify = computed(() => {
         </template>
     </Dialog>
 
-    <Dialog v-model:visible="showIncomingDialog" header="Incoming Purchase Orders" :modal="true" :style="{ width: '60vw' }">
+    <Dialog v-model:visible="showIncomingDialog" header="Incoming Purchase Orders" :modal="true" :style="{ width: '60vw' }" dismissableMask>
         <DataTable :value="incomingStock" size="small" stripedRows paginator :rows="5">
             <template #empty>No active POs found.</template>
             <Column field="purchase_orders.po_number" header="PO #"><template #body="{ data }"><router-link :to="`/purchases/${data.purchase_orders.id}`" class="text-primary font-bold">{{ data.purchase_orders.po_number }}</router-link></template></Column>
@@ -822,7 +822,7 @@ const isLinkedToShopify = computed(() => {
         @saved="onAdjustmentSaved"
     />
 
-    <Dialog v-model:visible="showSupplierStockDialog" header="Supplier Stock History" :modal="true" :style="{ width: '700px' }">
+    <Dialog v-model:visible="showSupplierStockDialog" header="Supplier Stock History" :modal="true" :style="{ width: '700px' }" dismissableMask>
         <div v-if="loadingSupplierHistory" class="flex justify-content-center py-6">
             <i class="pi pi-spin pi-spinner text-4xl text-500"></i>
         </div>

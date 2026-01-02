@@ -203,7 +203,7 @@ onMounted(() => {
             @saved="fetchLocations"
         />
 
-        <Dialog v-model:visible="showImportDialog" header="Import Locations" :modal="true" :style="{ width: '70vw' }" :maximizable="true">
+        <Dialog v-model:visible="showImportDialog" header="Import Locations" :modal="true" :style="{ width: '70vw' }" :maximizable="true" dismissableMask>
             <DataImportWizard mode="locations" />
         </Dialog>
     </div>

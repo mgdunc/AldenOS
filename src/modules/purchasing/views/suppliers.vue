@@ -75,7 +75,7 @@ onMounted(fetchSuppliers)
         </div>
     </div>
 
-    <Dialog v-model:visible="showDialog" header="New Supplier" modal :style="{ width: '400px' }">
+    <Dialog v-model:visible="showDialog" header="New Supplier" modal :style="{ width: '400px' }" dismissableMask>
         <div class="flex flex-column gap-3">
             <div class="flex flex-column gap-2">
                 <label class="font-bold">Company Name</label>

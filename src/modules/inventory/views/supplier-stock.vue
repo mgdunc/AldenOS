@@ -217,6 +217,7 @@ const onImported = () => {
       header="Unmatched Products"
       :style="{ width: '600px' }"
       :modal="true"
+      dismissableMask
     >
       <div v-if="selectedUpload" class="mb-3">
         <div class="text-500 text-sm">
