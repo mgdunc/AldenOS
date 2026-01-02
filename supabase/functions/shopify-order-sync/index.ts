@@ -276,13 +276,13 @@ async function syncLineItems(supabase: any, orderId: string, lineItems: any[]) {
   await supabase.from('sales_order_lines').delete().eq('sales_order_id', orderId)
 
   for (const item of lineItems) {
-    // Try to match product by SKU
+    // Try to match product by SKU (case-insensitive with trim)
     let productId = null
     if (item.sku) {
       const { data: product } = await supabase
         .from('products')
         .select('id')
-        .eq('sku', item.sku)
+        .ilike('sku', item.sku.trim())
         .maybeSingle()
       if (product) productId = product.id
     }

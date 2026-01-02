@@ -660,6 +660,36 @@ export function useSalesOrders() {
     }
   }
 
+  const relinkProductsBySKU = async () => {
+    saving.value = true
+
+    try {
+      const { data, error } = await supabase.rpc('link_sales_order_lines_by_sku')
+
+      if (error) throw error
+
+      const linesUpdated = data?.[0]?.lines_updated || 0
+
+      toast.add({
+        severity: linesUpdated > 0 ? 'success' : 'info',
+        summary: 'Relinked',
+        detail: `${linesUpdated} line items linked to products`
+      })
+
+      return linesUpdated
+    } catch (error: any) {
+      logger.error('Error relinking products:', error)
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: error.message
+      })
+      return 0
+    } finally {
+      saving.value = false
+    }
+  }
+
   return {
     loading,
     saving,
@@ -674,6 +704,7 @@ export function useSalesOrders() {
     confirmOrder,
     cancelOrder,
     revertToDraft,
+    relinkProductsBySKU,
     createFulfillment,
     loadFulfillments,
     searchCustomers,
