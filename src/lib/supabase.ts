@@ -12,18 +12,12 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 // Create Supabase client with explicit configuration for Edge Functions
-// Note: Edge Functions require both apikey and Authorization headers
+// The client automatically includes the session JWT in the Authorization header
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true
-  },
-  global: {
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`
-    }
   }
 })
 
