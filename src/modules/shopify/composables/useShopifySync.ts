@@ -64,8 +64,10 @@ export function useShopifySync(type: SyncType) {
     try {
       // Note: Edge functions read credentials from the database directly
       // No need to pass credentials in the body
+      // Function names: shopify-product-sync, shopify-order-sync (both singular)
+      const functionName = type === 'products' ? 'shopify-product-sync' : 'shopify-order-sync'
       const { data, error } = await supabase.functions.invoke(
-        `shopify-${type}-sync`,
+        functionName,
         {
           body: {} // Empty body - function reads from DB
         }
