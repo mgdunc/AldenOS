@@ -171,15 +171,15 @@ const fetchOrderData = async () => {
     
     // Fetch Shopify domain if this is a Shopify order
     if (result.order?.shopify_order_id) {
-        const { data: integrations } = await supabase
-            .from('integrations')
-            .select('settings')
-            .eq('provider', 'shopify')
+        const { data: credentials } = await supabase
+            .from('shopify_credentials')
+            .select('shop_url')
+            .eq('is_active', true)
             .limit(1)
-            .single()
+            .maybeSingle()
         
-        if (integrations?.settings?.shop_url) {
-            shopifyDomain.value = integrations.settings.shop_url
+        if (credentials?.shop_url) {
+            shopifyDomain.value = credentials.shop_url
         }
     }
 }

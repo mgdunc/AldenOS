@@ -134,11 +134,11 @@ const loadData = async () => {
         // 6. Fetch Suppliers
         const suppQuery = loadSuppliers()
 
-        // 7. Fetch Shopify Integration (single store)
+        // 7. Fetch Shopify Credentials (simplified single store)
         const shopifyQuery = supabase
-            .from('integrations')
-            .select('id, name, settings')
-            .eq('provider', 'shopify')
+            .from('shopify_credentials')
+            .select('shop_url')
+            .eq('is_active', true)
             .limit(1)
             .maybeSingle()
 
@@ -177,10 +177,9 @@ const loadData = async () => {
             incomingStock.value = poRes.data || []
             suppliers.value = suppRes || []
             
-            // Get Shopify domain from single integration
-            const shopifySettings = shopifyRes.data?.settings as { shop_url?: string } | null
-            if (shopifySettings?.shop_url) {
-                shopifyDomain.value = shopifySettings.shop_url
+            // Get Shopify domain from credentials
+            if (shopifyRes.data?.shop_url) {
+                shopifyDomain.value = shopifyRes.data.shop_url
             }
 
             // Calculate Demand from LINES (Outstanding Qty)
