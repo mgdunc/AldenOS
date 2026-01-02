@@ -24,11 +24,9 @@ app.use(PrimeVue, {
     theme: {
         preset: Aura
     },
-    pt: {
-        dialog: {
-            // Make all dialogs dismissable by clicking the mask/backdrop
-            dismissable: true
-        }
+    // Global component defaults
+    dialog: {
+        dismissableMask: true
     }
 })
 
